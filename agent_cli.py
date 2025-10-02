@@ -21,7 +21,7 @@ DEFAULT_ENDPOINTS: Dict[str, str] = {
     "openai": "https://api.openai.com/v1",
     "mistral": "https://api.mistral.ai/v1",
 }
-DEFAULT_MODEL = "llama3"
+DEFAULT_MODEL = "qwen3:14b"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_TIMEOUT = 120
 
