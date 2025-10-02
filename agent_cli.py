@@ -194,7 +194,7 @@ def _truncate(text: str, limit: int = 4000) -> str:
     return f"{text[:limit]}\n...[truncated {len(text) - limit} characters]"
 
 
-def _create_shell_tool() -> Tool:
+def _create_shell_tool(shell_timeout: int = 60) -> Tool:
     def run(args: Dict[str, Any]) -> str:
         command = args.get("command")
         if not command:
@@ -206,7 +206,7 @@ def _create_shell_tool() -> Tool:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=shell_timeout,
             )
         except subprocess.TimeoutExpired:
             return "ERROR: command timed out"
@@ -219,7 +219,7 @@ def _create_shell_tool() -> Tool:
 
     return Tool(
         name="run_shell",
-        description="Execute a shell command inside the current workspace (timeout 60s).",
+        description=f"Execute a shell command inside the current workspace (timeout {shell_timeout}s).",
         schema='{"command": "<shell command string>"}',
         handler=run,
     )
@@ -252,9 +252,9 @@ def _create_read_url_tool() -> Tool:
     )
 
 
-def build_tools() -> ToolRegistry:
+def build_tools(shell_timeout: int = 60) -> ToolRegistry:
     registry = ToolRegistry()
-    registry.register(_create_shell_tool())
+    registry.register(_create_shell_tool(shell_timeout=shell_timeout))
     registry.register(_create_read_url_tool())
     return registry
 
@@ -265,13 +265,25 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--model", default="qwen3:14b", help="Ollama model name (default: qwen3:14b).")
     parser.add_argument("--base-url", default="http://localhost:11434", help="Base URL for Ollama (default: http://localhost:11434).")
     parser.add_argument("--temperature", type=float, default=0.7, help="Sampling temperature passed to Ollama.")
+    parser.add_argument(
+        "--shell-timeout",
+        type=int,
+        default=60,
+        help="Timeout in seconds for the run_shell tool (default: 60).",
+    )
+    parser.add_argument(
+        "--ollama-timeout",
+        type=int,
+        default=120,
+        help="Request timeout in seconds for Ollama responses (default: 120).",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
-    tools = build_tools()
-    client = OllamaClient(args.base_url)
+    tools = build_tools(shell_timeout=args.shell_timeout)
+    client = OllamaClient(args.base_url, timeout=args.ollama_timeout)
     agent = AgentCLI(
         model=args.model,
         client=client,

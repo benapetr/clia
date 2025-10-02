@@ -30,6 +30,18 @@ You can provide an initial message and override model settings:
 python3 agent_cli.py "help me summarize this repo" --model llama3.1 --temperature 0.2
 ```
 
+Use `--shell-timeout` to adjust how long the `run_shell` tool may run (in seconds):
+
+```bash
+python3 agent_cli.py --shell-timeout 120
+```
+
+Use `--ollama-timeout` to set the request timeout for streaming responses from Ollama:
+
+```bash
+python3 agent_cli.py --ollama-timeout 300
+```
+
 While the program is running:
 
 - Type your prompts after the `you>` prompt.
@@ -42,7 +54,7 @@ Two tools are registered by default:
 
 | Tool       | Description                                                        | Arguments                               |
 |------------|--------------------------------------------------------------------|-----------------------------------------|
-| `run_shell` | Execute shell commands inside the project workspace (60s timeout). | `{ "command": "<shell command string>" }` |
+| `run_shell` | Execute shell commands inside the project workspace (timeout configurable via `--shell-timeout`). | `{ "command": "<shell command string>" }` |
 | `read_url` | Fetch webpage text with HTML stripped, capped at 4,000 characters. | `{ "url": "https://example.com" }`        |
 
 You can add more tools by extending `build_tools()` in `agent_cli.py`.
