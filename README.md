@@ -75,6 +75,7 @@ Two tools are registered by default:
 |------------|--------------------------------------------------------------------|-----------------------------------------|
 | `run_shell` | Execute shell commands inside the project workspace (timeout configurable via `--shell-timeout`). | `{ "command": "<shell command string>" }` |
 | `read_url` | Fetch webpage text with HTML stripped, capped at 4,000 characters. | `{ "url": "https://example.com" }`        |
+| `search_internet` | Query DuckDuckGo for quick search snippets.                         | `{ "query": "open source llm agents" }`    |
 
 You can add more tools by extending `build_tools()` in `agent_cli.py`.
 
