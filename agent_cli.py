@@ -91,6 +91,7 @@ class AgentCLI:
     COLOR_RESET = "\033[0m"
     COLOR_AGENT = "\033[36m"  # cyan
     COLOR_USER = "\033[33m"  # yellow
+    COLOR_THINK = "\033[90m"  # light gray
 
     def __init__(
         self,
@@ -170,15 +171,97 @@ class AgentCLI:
         agent_label = self._label("agent>", self.COLOR_AGENT)
         print(f"{agent_label} ", end="", flush=True)
         chunks: List[str] = []
+        buffer = ""
+        in_think = False
         try:
             for delta in self.client.chat_stream(self.model, conversation, self.options):
-                print(delta, end="", flush=True)
+                to_print, buffer, in_think = self._render_think_chunk(delta, buffer, in_think)
+                if to_print:
+                    print(to_print, end="", flush=True)
                 chunks.append(delta)
+            # Flush any remaining buffered text after the stream ends
+            tail, buffer, in_think = self._render_think_chunk("", buffer, in_think, finalize=True)
+            if tail:
+                print(tail, end="", flush=True)
         except Exception as exc:
             print(f"\n[error] {exc}")
             return None
         print()
         return "".join(chunks).strip()
+
+    def _render_think_chunk(
+        self,
+        chunk: str,
+        buffer: str,
+        in_think: bool,
+        finalize: bool = False,
+    ) -> tuple[str, str, bool]:
+        if not self._use_color:
+            # When colors are disabled we do not need special handling; just pass text through.
+            return chunk, "", False
+
+        buffer += chunk
+        output_parts: List[str] = []
+        open_tag = "<think>"
+        close_tag = "</think>"
+
+        while buffer:
+            if not in_think:
+                idx = buffer.find(open_tag)
+                if idx == -1:
+                    if finalize:
+                        output_parts.append(buffer)
+                        buffer = ""
+                    else:
+                        keep = self._partial_tag_suffix(buffer, open_tag)
+                        flush_len = len(buffer) - keep
+                        if flush_len:
+                            output_parts.append(buffer[:flush_len])
+                            buffer = buffer[flush_len:]
+                        else:
+                            break
+                    continue
+                if idx:
+                    output_parts.append(buffer[:idx])
+                output_parts.append(self._color_think(open_tag))
+                buffer = buffer[idx + len(open_tag) :]
+                in_think = True
+            else:
+                idx = buffer.find(close_tag)
+                if idx == -1:
+                    if finalize:
+                        if buffer:
+                            output_parts.append(self._color_think(buffer))
+                            buffer = ""
+                        break
+                    keep = self._partial_tag_suffix(buffer, close_tag)
+                    flush_len = len(buffer) - keep
+                    if flush_len:
+                        segment = buffer[:flush_len]
+                        output_parts.append(self._color_think(segment))
+                        buffer = buffer[flush_len:]
+                    else:
+                        break
+                    continue
+                if idx:
+                    output_parts.append(self._color_think(buffer[:idx]))
+                output_parts.append(self._color_think(close_tag))
+                buffer = buffer[idx + len(close_tag) :]
+                in_think = False
+
+        return "".join(output_parts), buffer, in_think
+
+    def _partial_tag_suffix(self, text: str, tag: str) -> int:
+        max_check = min(len(text), len(tag) - 1)
+        for size in range(max_check, 0, -1):
+            if text.endswith(tag[:size]):
+                return size
+        return 0
+
+    def _color_think(self, text: str) -> str:
+        if not text:
+            return text
+        return f"{self.COLOR_THINK}{text}{self.COLOR_RESET}"
 
     def _parse_tool_call(self, message: str) -> Optional[tuple[str, Dict[str, Any]]]:
         match = self.TOOL_CALL_PATTERN.search(message)
