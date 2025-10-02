@@ -11,7 +11,8 @@ import sys
 import textwrap
 from dataclasses import dataclass
 from html import unescape
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 try:
     import requests
@@ -58,6 +59,40 @@ class ToolRegistry:
             return f"ERROR while running '{name}': {exc}"
 
 
+class ToolApprovalManager:
+    def __init__(self, config_dir: Path) -> None:
+        self.config_dir = config_dir
+        self.allowed_file = self.config_dir / "allowed_tools"
+        self.approved: Set[str] = set()
+        self._load()
+
+    def _load(self) -> None:
+        try:
+            with self.allowed_file.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    name = line.strip()
+                    if name:
+                        self.approved.add(name)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            print(f"[warning] Failed to read allowed tools file: {exc}")
+
+    def is_approved(self, name: str) -> bool:
+        return name in self.approved
+
+    def approve_always(self, name: str) -> None:
+        if name in self.approved:
+            return
+        self.approved.add(name)
+        try:
+            self.config_dir.mkdir(parents=True, exist_ok=True)
+            with self.allowed_file.open("a", encoding="utf-8") as handle:
+                handle.write(f"{name}\n")
+        except OSError as exc:
+            print(f"[warning] Failed to persist tool approval: {exc}")
+
+
 class OllamaClient:
     def __init__(self, base_url: str, timeout: int = 120) -> None:
         if not requests:
@@ -98,12 +133,14 @@ class AgentCLI:
         model: str,
         client: OllamaClient,
         tools: ToolRegistry,
+        approval_mgr: ToolApprovalManager,
         options: Optional[Dict[str, Any]] = None,
         use_color: Optional[bool] = None,
     ) -> None:
         self.model = model
         self.client = client
         self.tools = tools
+        self.approval_mgr = approval_mgr
         self.options = options or {}
         self.system_prompt = self._build_system_prompt()
         self._use_color = sys.stdout.isatty() if use_color is None else use_color
@@ -162,6 +199,12 @@ class AgentCLI:
                 break
             tool_name, tool_args = tool_call
             print(f"\n[tool call] {tool_name} {tool_args}")
+            if not self._approve_tool_run(tool_name, tool_args):
+                print("[tool skipped] execution denied by user")
+                denial = "Tool execution denied by user."
+                wrapped_result = self._format_tool_result(tool_name, denial)
+                conversation.append({"role": "user", "content": wrapped_result})
+                continue
             tool_result = self.tools.execute(tool_name, tool_args)
             print(f"[tool result]\n{tool_result}\n")
             wrapped_result = self._format_tool_result(tool_name, tool_result)
@@ -262,6 +305,29 @@ class AgentCLI:
         if not text:
             return text
         return f"{self.COLOR_THINK}{text}{self.COLOR_RESET}"
+
+    def _approve_tool_run(self, name: str, args: Dict[str, Any]) -> bool:
+        if self.approval_mgr.is_approved(name):
+            return True
+        decision = self._prompt_tool_consent(name, args)
+        if decision == "n":
+            return False
+        if decision == "a":
+            self.approval_mgr.approve_always(name)
+        return True
+
+    def _prompt_tool_consent(self, name: str, args: Dict[str, Any]) -> str:
+        pretty_args = json.dumps(args, indent=2, sort_keys=True)
+        print("Requested tool execution:")
+        print(f"  name: {name}")
+        print("  args:")
+        for line in pretty_args.splitlines():
+            print(f"    {line}")
+        while True:
+            response = input("Allow this tool? [y]es/[n]o/[a]lways: ").strip().lower()
+            if response in {"y", "n", "a"}:
+                return response
+            print("Please respond with 'y', 'n', or 'a'.")
 
     def _parse_tool_call(self, message: str) -> Optional[tuple[str, Dict[str, Any]]]:
         match = self.TOOL_CALL_PATTERN.search(message)
@@ -383,17 +449,24 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Disable ANSI colors in CLI prompts (auto-detected by default).",
     )
+    parser.add_argument(
+        "--config-dir",
+        help="Directory used to persist agent configuration (default: ~/.config/clia).",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     tools = build_tools(shell_timeout=args.shell_timeout)
+    config_dir = Path(args.config_dir).expanduser() if args.config_dir else Path.home() / ".config" / "clia"
+    approval_mgr = ToolApprovalManager(config_dir)
     client = OllamaClient(args.base_url, timeout=args.ollama_timeout)
     agent = AgentCLI(
         model=args.model,
         client=client,
         tools=tools,
+        approval_mgr=approval_mgr,
         options={"temperature": args.temperature},
         use_color=False if args.no_color else None,
     )

@@ -48,12 +48,24 @@ Disable colored prompts if your terminal does not support ANSI escape codes:
 python3 agent_cli.py --no-color
 ```
 
+Override the configuration directory (default is `~/.config/clia`):
+
+```bash
+python3 agent_cli.py --config-dir ./tmp/config
+```
+
 While the program is running:
 
 - Type your prompts after the `you>` prompt (shown in yellow when the terminal supports color, or plain if `--no-color` is used).
 - Enter `exit` or press `Ctrl+D` to quit.
 - When the model decides to use a tool, the CLI displays the call and its result before continuing the chat; agent output is prefixed with a cyan `agent>` label (plain when `--no-color` is active).
 - For models that emit `<think>...</think>` meta tags, the content inside the tags is rendered in light gray to distinguish reasoning from the final answer (colorized output only).
+
+## Tool Approval Workflow
+
+- On startup, the agent reads a list of auto-approved tools from `allowed_tools` inside the configuration directory (default `~/.config/clia/allowed_tools`).
+- When the model requests a tool that is not on the approved list, the CLI prompts you to allow it once (`y`), deny it (`n`), or always allow it (`a`).
+- Choosing `a` adds the tool to the in-memory allowlist and appends it to `allowed_tools`, creating the file if necessary.
 
 ## Tooling
 
