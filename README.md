@@ -42,11 +42,17 @@ Use `--ollama-timeout` to set the request timeout for streaming responses from O
 python3 agent_cli.py --ollama-timeout 300
 ```
 
+Disable colored prompts if your terminal does not support ANSI escape codes:
+
+```bash
+python3 agent_cli.py --no-color
+```
+
 While the program is running:
 
-- Type your prompts after the `you>` prompt.
+- Type your prompts after the `you>` prompt (shown in yellow when the terminal supports color, or plain if `--no-color` is used).
 - Enter `exit` or press `Ctrl+D` to quit.
-- When the model decides to use a tool, the CLI displays the call and its result before continuing the chat.
+- When the model decides to use a tool, the CLI displays the call and its result before continuing the chat; agent output is prefixed with a cyan `agent>` label (plain when `--no-color` is active).
 
 ## Tooling
 

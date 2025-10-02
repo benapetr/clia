@@ -88,13 +88,29 @@ class OllamaClient:
 
 class AgentCLI:
     TOOL_CALL_PATTERN = re.compile(r"<tool name=\"(?P<name>[a-zA-Z0-9_\-]+)\">\s*(?P<body>\{.*?\})\s*</tool>", re.DOTALL)
+    COLOR_RESET = "\033[0m"
+    COLOR_AGENT = "\033[36m"  # cyan
+    COLOR_USER = "\033[33m"  # yellow
 
-    def __init__(self, model: str, client: OllamaClient, tools: ToolRegistry, options: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        client: OllamaClient,
+        tools: ToolRegistry,
+        options: Optional[Dict[str, Any]] = None,
+        use_color: Optional[bool] = None,
+    ) -> None:
         self.model = model
         self.client = client
         self.tools = tools
         self.options = options or {}
         self.system_prompt = self._build_system_prompt()
+        self._use_color = sys.stdout.isatty() if use_color is None else use_color
+
+    def _label(self, label: str, color: str) -> str:
+        if not self._use_color:
+            return label
+        return f"{color}{label}{self.COLOR_RESET}"
 
     def _build_system_prompt(self) -> str:
         tool_descriptions = self.tools.describe_for_prompt()
@@ -121,7 +137,8 @@ class AgentCLI:
             self._agent_turn(conversation)
         while True:
             try:
-                user_input = input("you> ")
+                user_label = self._label("you>", self.COLOR_USER)
+                user_input = input(f"{user_label} ")
             except (EOFError, KeyboardInterrupt):
                 print("\nExiting.")
                 return
@@ -150,7 +167,8 @@ class AgentCLI:
             conversation.append({"role": "user", "content": wrapped_result})
 
     def _stream_response(self, conversation: List[Dict[str, Any]]) -> Optional[str]:
-        print("agent> ", end="", flush=True)
+        agent_label = self._label("agent>", self.COLOR_AGENT)
+        print(f"{agent_label} ", end="", flush=True)
         chunks: List[str] = []
         try:
             for delta in self.client.chat_stream(self.model, conversation, self.options):
@@ -277,6 +295,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         default=120,
         help="Request timeout in seconds for Ollama responses (default: 120).",
     )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable ANSI colors in CLI prompts (auto-detected by default).",
+    )
     return parser.parse_args(argv)
 
 
@@ -289,6 +312,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         client=client,
         tools=tools,
         options={"temperature": args.temperature},
+        use_color=False if args.no_color else None,
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
