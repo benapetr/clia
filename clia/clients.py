@@ -37,6 +37,13 @@ class OllamaClient(ChatClient):
         if options:
             payload["options"] = options
         response = requests.post(url, json=payload, stream=True, timeout=self.timeout)
+        if response.status_code == 404:
+            # Older Ollama versions or missing chat endpoint – attempt fallback.
+            fallback_error = _extract_error(response)
+            if fallback_error and "model" in fallback_error.lower() and "not found" in fallback_error.lower():
+                raise RuntimeError(fallback_error)
+            yield from self._chat_via_generate(model, messages, options)
+            return
         response.raise_for_status()
         for line in response.iter_lines():
             if not line:
@@ -48,6 +55,35 @@ class OllamaClient(ChatClient):
             content = message.get("content", "")
             if content:
                 yield content
+            if data.get("done", False):
+                break
+
+    def _chat_via_generate(
+        self,
+        model: str,
+        messages: List[Dict[str, Any]],
+        options: Optional[Dict[str, Any]],
+    ) -> Iterable[str]:
+        prompt = _messages_to_prompt(messages)
+        url = f"{self.base_url}/api/generate"
+        payload: Dict[str, Any] = {
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+        }
+        if options:
+            payload["options"] = options
+        response = requests.post(url, json=payload, stream=True, timeout=self.timeout)
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line:
+                continue
+            data = json.loads(line)
+            if data.get("error"):
+                raise RuntimeError(data["error"])
+            chunk = data.get("response")
+            if chunk:
+                yield chunk
             if data.get("done", False):
                 break
 
@@ -169,3 +205,38 @@ def create_client(
             raise ValueError("Mistral provider requires an API key")
         return MistralClient(endpoint, api_key=api_key, timeout=timeout)
     raise ValueError(f"Unsupported provider '{provider}'")
+
+
+def _extract_error(response: Any) -> str:
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            error = data.get("error")
+            if isinstance(error, str):
+                return error
+    except ValueError:
+        pass
+    try:
+        text = response.text
+        if text:
+            return text
+    except Exception:  # pragma: no cover - extremely defensive
+        return ""
+    return ""
+
+
+def _messages_to_prompt(messages: List[Dict[str, Any]]) -> str:
+    parts: List[str] = []
+    for message in messages:
+        role = message.get("role", "")
+        content = message.get("content", "")
+        if not content:
+            continue
+        if role == "system":
+            parts.append(f"System: {content}")
+        elif role == "assistant":
+            parts.append(f"Assistant: {content}")
+        else:
+            parts.append(f"User: {content}")
+    parts.append("Assistant:")
+    return "\n\n".join(parts)
