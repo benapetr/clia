@@ -1,12 +1,15 @@
 # Ollama Agent CLI
 
-An interactive command-line interface that lets a local Ollama model act as a tool-using agent. The assistant can stream responses in real time and invoke registered tools—such as running shell commands or fetching webpage text—to complete tasks autonomously.
+An interactive command-line interface that lets an LLM act as a tool-using agent. The assistant can stream responses in real time and invoke registered tools—such as running shell commands or fetching webpage text—to complete tasks autonomously. By default the CLI targets a local Ollama instance, but it can also connect to OpenAI or Mistral endpoints.
 
 ## Requirements
 
 - Python 3.9+
 - `requests` Python package
-- Local Ollama server running on `http://localhost:11434`
+- One of:
+  - Local Ollama server running on `http://localhost:11434` (default)
+  - OpenAI API access with a valid key
+  - Mistral API access with a valid key
 
 ## Installation
 
@@ -36,10 +39,10 @@ Use `--shell-timeout` to adjust how long the `run_shell` tool may run (in second
 python3 agent_cli.py --shell-timeout 120
 ```
 
-Use `--ollama-timeout` to set the request timeout for streaming responses from Ollama:
+Use `--request-timeout` to set the request timeout for streaming responses:
 
 ```bash
-python3 agent_cli.py --ollama-timeout 300
+python3 agent_cli.py --request-timeout 300
 ```
 
 Disable colored prompts if your terminal does not support ANSI escape codes:
@@ -54,13 +57,36 @@ Override the configuration directory (default is `~/.config/clia`):
 python3 agent_cli.py --config-dir ./tmp/config
 ```
 
+Switch providers from the command line:
+
+```bash
+python3 agent_cli.py --provider openai --model gpt-4o-mini --api-key "$OPENAI_API_KEY"
+```
+
+## Configuration
+
+When present, `~/.config/clia/config.ini` (override with `--config-dir`) supplies defaults:
+
+```ini
+[model]
+provider = ollama           # or openai / mistral
+model = llama3
+endpoint = http://localhost:11434
+api_key =                   # required for openai/mistral
+temperature = 0.7
+timeout = 120
+```
+
+CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
+
 ## Project Structure
 
 ```
 agent_cli.py        # CLI entrypoint and argument parsing
 clia/
   cli.py            # Conversation loop, streaming, and tool orchestration
-  ollama.py         # Thin client around the local Ollama HTTP API
+  clients.py        # HTTP clients for Ollama, OpenAI, and Mistral
+  ollama.py         # Compatibility shim re-exporting the Ollama client
   approval.py       # Tool approval persistence and prompts
   tooling.py        # Tool dataclass and registry implementation
   utils.py          # Shared helpers (HTML stripping, truncation)
@@ -93,7 +119,7 @@ Two tools are registered by default:
 | `read_url` | Fetch webpage text with HTML stripped, capped at 4,000 characters. | `{ "url": "https://example.com" }`        |
 | `search_internet` | Query DuckDuckGo for quick search snippets.                         | `{ "query": "open source llm agents" }`    |
 
-You can add more tools by extending `build_tools()` in `agent_cli.py`.
+You can add more tools by extending `clia/tools/__init__.py`.
 
 ## Development
 

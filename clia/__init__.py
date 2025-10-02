@@ -2,6 +2,7 @@
 
 __all__ = [
     "cli",
+    "clients",
     "ollama",
     "tooling",
     "approval",

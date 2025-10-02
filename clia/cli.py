@@ -7,7 +7,7 @@ import textwrap
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from clia.approval import ToolApprovalManager
-from clia.ollama import OllamaClient
+from clia.clients import ChatClient
 from clia.tooling import ToolRegistry
 
 
@@ -21,7 +21,7 @@ class AgentCLI:
     def __init__(
         self,
         model: str,
-        client: OllamaClient,
+        client: ChatClient,
         tools: ToolRegistry,
         approval_mgr: ToolApprovalManager,
         options: Optional[Dict[str, Any]] = None,
