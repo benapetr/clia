@@ -54,6 +54,22 @@ Override the configuration directory (default is `~/.config/clia`):
 python3 agent_cli.py --config-dir ./tmp/config
 ```
 
+## Project Structure
+
+```
+agent_cli.py        # CLI entrypoint and argument parsing
+clia/
+  cli.py            # Conversation loop, streaming, and tool orchestration
+  ollama.py         # Thin client around the local Ollama HTTP API
+  approval.py       # Tool approval persistence and prompts
+  tooling.py        # Tool dataclass and registry implementation
+  utils.py          # Shared helpers (HTML stripping, truncation)
+  tools/
+    run_shell.py    # Shell command execution tool
+    read_url.py     # URL fetch/strip tool
+    search_internet.py  # DuckDuckGo search tool
+```
+
 While the program is running:
 
 - Type your prompts after the `you>` prompt (shown in yellow when the terminal supports color, or plain if `--no-color` is used).
