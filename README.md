@@ -6,6 +6,7 @@ An interactive command-line interface that lets an LLM act as a tool-using agent
 
 - Python 3.9+
 - `requests` Python package
+- `ddgs` Python package (required for DuckDuckGo search; optional if using Google only)
 - One of:
   - Local Ollama server running on `http://localhost:11434` (default)
   - OpenAI API access with a valid key
@@ -16,7 +17,7 @@ An interactive command-line interface that lets an LLM act as a tool-using agent
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install requests
+pip install requests ddgs
 ```
 
 ## Usage
@@ -75,9 +76,17 @@ endpoint = http://localhost:11434
 api_key =                   # required for openai/mistral
 temperature = 0.7
 timeout = 120
+
+[search]
+provider = duckduckgo       # or google
+api_key =                   # required when provider = google
+engine_id =                 # Google Programmable Search Engine ID (cx)
 ```
 
 CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
+
+When `search.provider = google`, populate both `api_key` and `engine_id` with credentials for a Google Programmable Search Engine (Custom Search JSON API). DuckDuckGo requires no additional configuration.
+DuckDuckGo searches depend on the optional `ddgs` package; install it alongside `requests` when using the default provider.
 
 ## Project Structure
 
@@ -93,7 +102,7 @@ clia/
   tools/
     run_shell.py    # Shell command execution tool
     read_url.py     # URL fetch/strip tool
-    search_internet.py  # DuckDuckGo search tool
+    search_internet.py  # Configurable internet search tool
 ```
 
 While the program is running:
@@ -117,7 +126,7 @@ Two tools are registered by default:
 |------------|--------------------------------------------------------------------|-----------------------------------------|
 | `run_shell` | Execute shell commands inside the project workspace (timeout configurable via `--shell-timeout`). | `{ "command": "<shell command string>" }` |
 | `read_url` | Fetch webpage text with HTML stripped, capped at 4,000 characters. | `{ "url": "https://example.com" }`        |
-| `search_internet` | Query DuckDuckGo for quick search snippets.                         | `{ "query": "open source llm agents" }`    |
+| `search_internet` | Query the configured search provider (DuckDuckGo or Google PSE).    | `{ "query": "open source llm agents" }`    |
 
 You can add more tools by extending `clia/tools/__init__.py`.
 

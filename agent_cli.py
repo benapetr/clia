@@ -14,6 +14,7 @@ from clia.approval import ToolApprovalManager
 from clia.cli import AgentCLI
 from clia.clients import create_client
 from clia.tools import build_tools
+from clia.tools.search_internet import SearchConfig
 
 DEFAULT_ENDPOINTS: Dict[str, str] = {
     "ollama": "http://localhost:11434",
@@ -68,10 +69,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
-    tools = build_tools(shell_timeout=args.shell_timeout)
     config_dir = Path(args.config_dir).expanduser() if args.config_dir else Path.home() / ".config" / "clia"
+    config = ConfigParser()
+    config_path = config_dir / "config.ini"
+    config.read(config_path)
+    search_config = resolve_search_config(config)
+    tools = build_tools(shell_timeout=args.shell_timeout, search_config=search_config)
     approval_mgr = ToolApprovalManager(config_dir)
-    settings = resolve_client_settings(args, config_dir)
+    settings = resolve_client_settings(args, config_dir, config)
     client = create_client(
         provider=settings.provider,
         endpoint=settings.endpoint,
@@ -91,10 +96,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     return 0
 
 
-def resolve_client_settings(args: argparse.Namespace, config_dir: Path) -> ClientSettings:
-    config = ConfigParser()
-    config_path = config_dir / "config.ini"
-    config.read(config_path)
+def resolve_client_settings(args: argparse.Namespace, config_dir: Path, config: ConfigParser) -> ClientSettings:
     section = config["model"] if config.has_section("model") else None
 
     provider = (args.provider or (section.get("provider") if section else None) or "ollama").lower()
@@ -139,6 +141,24 @@ def resolve_client_settings(args: argparse.Namespace, config_dir: Path) -> Clien
         api_key=api_key,
         temperature=temperature,
         timeout=timeout,
+    )
+
+
+def resolve_search_config(config: ConfigParser) -> SearchConfig:
+    section = config["search"] if config.has_section("search") else None
+    provider = (section.get("provider") if section else None) or "duckduckgo"
+    provider = provider.lower()
+    if provider not in {"duckduckgo", "google"}:
+        print(f"[warning] Unsupported search provider '{provider}' in config.ini; falling back to DuckDuckGo")
+        provider = "duckduckgo"
+    google_api_key = section.get("api_key") if section else None
+    google_engine_id = (
+        section.get("engine_id") if section else None
+    ) or (section.get("cx") if section else None)
+    return SearchConfig(
+        provider=provider,
+        google_api_key=google_api_key,
+        google_engine_id=google_engine_id,
     )
 
 
