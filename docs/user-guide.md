@@ -58,6 +58,7 @@ Notes:
 - DuckDuckGo search requires no API key but needs the `ddgs` Python package (installed earlier).
 - Set `storage.sessions_dir` to change where sessions are saved. Paths may be absolute and will expand `~`.
 - Provide `system_prompt` to point at a template file (absolute or relative to the config directory). Use `{tools}`, `{tool_descriptions}`, or `{{tools}}` inside the template to inject the current tool descriptions.
+  See `docs/system-prompt-example.txt` for a starter template you can copy.
 
 ## 4. Running the Agent
 
