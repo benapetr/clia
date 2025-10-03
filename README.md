@@ -95,6 +95,7 @@ agent_cli.py        # CLI entrypoint and argument parsing
 clia/
   cli.py            # Conversation loop, streaming, and tool orchestration
   clients.py        # HTTP clients for Ollama, OpenAI, and Mistral
+  commands/         # Slash-command framework and default command handlers
   ollama.py         # Compatibility shim re-exporting the Ollama client
   approval.py       # Tool approval persistence and prompts
   tooling.py        # Tool dataclass and registry implementation

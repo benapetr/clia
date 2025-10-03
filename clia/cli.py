@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from clia.approval import ToolApprovalManager
 from clia.clients import ChatClient
+from clia.commands import CommandOutcome, build_default_registry
 from clia.tooling import ToolRegistry
 
 
@@ -40,6 +41,7 @@ class AgentCLI:
         self._use_color = sys.stdout.isatty() if use_color is None else use_color
         self.session_dir = Path(session_dir) if session_dir else Path.cwd() / "sessions"
         self.conversation: List[Dict[str, Any]] = []
+        self.command_registry = build_default_registry()
 
     def _label(self, label: str, color: str) -> str:
         if not self._use_color:
@@ -79,9 +81,9 @@ class AgentCLI:
             if not user_input.strip():
                 continue
             stripped = user_input.strip()
-            if stripped.startswith("/"):
-                result = self._handle_system_command(stripped)
-                if result == "exit":
+            if stripped.startswith(self.command_registry.prefix):
+                outcome = self.command_registry.dispatch(stripped, self)
+                if outcome == CommandOutcome.EXIT:
                     print("Bye.")
                     return
                 continue
@@ -217,42 +219,7 @@ class AgentCLI:
             self.approval_mgr.approve_always(name)
         return True
 
-    def _handle_system_command(self, command: str) -> Optional[str]:
-        parts = command.split(maxsplit=1)
-        name = parts[0].lower()
-        argument = parts[1].strip() if len(parts) > 1 else ""
-        if name == "/exit":
-            return "exit"
-        if name == "/help":
-            self._print_help()
-            return None
-        if name == "/save":
-            if not argument:
-                print("Usage: /save <name>")
-                return None
-            self._save_session(argument)
-            return None
-        if name == "/load":
-            if not argument:
-                print("Usage: /load <name>")
-                return None
-            self._load_session(argument)
-            return None
-        if name == "/info":
-            self._session_info()
-            return None
-        print("Unknown command. Type /help for a list of commands.")
-        return None
-
-    def _print_help(self) -> None:
-        print("Available commands:")
-        print("  /help           Show this help message")
-        print("  /info           Display model and session statistics")
-        print("  /save <name>    Save the current session to <name>.json")
-        print("  /load <name>    Load a saved session from <name>.json")
-        print("  /exit           Exit the program")
-
-    def _save_session(self, raw_name: str) -> None:
+    def save_session(self, raw_name: str) -> None:
         name = self._sanitize_session_name(raw_name)
         if not name:
             print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
@@ -268,7 +235,7 @@ class AgentCLI:
             return
         print(f"Session saved to {path}")
 
-    def _load_session(self, raw_name: str) -> None:
+    def load_session(self, raw_name: str) -> None:
         name = self._sanitize_session_name(raw_name)
         if not name:
             print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
@@ -295,15 +262,15 @@ class AgentCLI:
         self.conversation = conversation
         print(f"Session '{name}' loaded. Conversation length: {len(self.conversation)} messages.")
 
-    def _session_info(self) -> None:
+    def session_info(self) -> None:
         message_count = len(self.conversation)
-        approx_tokens = self._estimate_tokens()
+        approx_tokens = self.estimate_tokens()
         print(f"Provider: {self.provider}")
         print(f"Model: {self.model}")
         print(f"Messages in session: {message_count}")
         print(f"Approximate tokens: {approx_tokens}")
 
-    def _estimate_tokens(self) -> int:
+    def estimate_tokens(self) -> int:
         total_words = 0
         for message in self.conversation:
             content = message.get("content")
