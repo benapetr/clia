@@ -93,6 +93,7 @@ When `search.provider = google`, populate both `api_key` and `engine_id` with cr
 Set `storage.sessions_dir` to change where session files are stored; paths are expanded with `~` and may be absolute.
 DuckDuckGo searches depend on the optional `ddgs` package; install it alongside `requests` when using the default provider.
 Set `system_prompt` to the path of a template file (absolute or relative to the config directory). The template may include `{tools}`, `{tool_descriptions}`, or `{{tools}}` placeholders, which are replaced with the current tool list.
+An example starter template lives at `docs/system-prompt-example.txt`.
 
 ## Project Structure
 
