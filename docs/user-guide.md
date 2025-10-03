@@ -90,6 +90,7 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 - `/ls` – list saved sessions in the configured directory
 - `/rm <name|path>` – delete a saved session file
 - `/tail [N]` – display the last `N` conversation messages (defaults to 5)
+- `/truncate on|off` – toggle global tool output truncation
 - `/exit` – exit immediately
 
 ### Tool Permissions

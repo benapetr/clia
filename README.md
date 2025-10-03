@@ -124,6 +124,7 @@ While the program is running:
   - `/ls` – list saved session files in the configured directory
   - `/rm <name|path>` – delete a saved session file
   - `/tail [N]` – print the last `N` conversation messages (default 5)
+  - `/truncate on|off` – enable or disable tool output truncation globally
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow

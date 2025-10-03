@@ -12,6 +12,7 @@ from clia.approval import ToolApprovalManager
 from clia.clients import ChatClient
 from clia.commands import CommandOutcome, build_default_registry
 from clia.tooling import ToolRegistry
+from clia.utils import is_truncation_enabled, set_truncation_enabled
 
 
 class AgentCLI:
@@ -321,6 +322,7 @@ class AgentCLI:
         else:
             approx_tokens = self.estimate_tokens()
             print(f"Approximate tokens: {approx_tokens}")
+        print(f"Truncation: {'on' if is_truncation_enabled() else 'off'}")
 
     def estimate_tokens(self) -> int:
         total_words = 0
@@ -365,6 +367,11 @@ class AgentCLI:
             role = message.get("role", "unknown").upper()
             content = message.get("content", "")
             print(f"[{role}] {content}")
+
+    def set_truncation(self, enabled: bool) -> None:
+        set_truncation_enabled(enabled)
+        state = "enabled" if enabled else "disabled"
+        print(f"Tool output truncation {state}.")
 
     @staticmethod
     def _sanitize_session_name(name: str) -> str:
