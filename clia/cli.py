@@ -298,6 +298,16 @@ class AgentCLI:
             return
         print(f"Removed session file {path}")
 
+    def show_tail(self, count: int) -> None:
+        relevant = self.conversation[-count:]
+        if not relevant:
+            print("Conversation is empty.")
+            return
+        for message in relevant:
+            role = message.get("role", "unknown").upper()
+            content = message.get("content", "")
+            print(f"[{role}] {content}")
+
     @staticmethod
     def _sanitize_session_name(name: str) -> str:
         sanitized = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.strip())

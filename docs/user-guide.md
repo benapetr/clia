@@ -89,6 +89,7 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 - `/load <name|path>` – load a previous session using a name or direct file path
 - `/ls` – list saved sessions in the configured directory
 - `/rm <name|path>` – delete a saved session file
+- `/tail [N]` – display the last `N` conversation messages (defaults to 5)
 - `/exit` – exit immediately
 
 ### Tool Permissions

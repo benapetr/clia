@@ -123,6 +123,7 @@ While the program is running:
   - `/load <name|path>` – restore a saved dialogue from the configured directory or an explicit path
   - `/ls` – list saved session files in the configured directory
   - `/rm <name|path>` – delete a saved session file
+  - `/tail [N]` – print the last `N` conversation messages (default 5)
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow

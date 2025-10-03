@@ -60,7 +60,7 @@ class CommandRegistry:
 
 def build_default_registry(prefix: str = COMMAND_PREFIX) -> CommandRegistry:
     registry = CommandRegistry(prefix)
-    from clia.commands import exit_cmd, help_cmd, info_cmd, list_cmd, load_cmd, remove_cmd, save_cmd
+    from clia.commands import exit_cmd, help_cmd, info_cmd, list_cmd, load_cmd, remove_cmd, save_cmd, tail_cmd
 
     exit_cmd.register(registry)
     help_cmd.register(registry)
@@ -69,4 +69,5 @@ def build_default_registry(prefix: str = COMMAND_PREFIX) -> CommandRegistry:
     load_cmd.register(registry)
     remove_cmd.register(registry)
     save_cmd.register(registry)
+    tail_cmd.register(registry)
     return registry
