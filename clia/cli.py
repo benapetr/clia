@@ -4,6 +4,7 @@ import json
 import re
 import sys
 import textwrap
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from clia.approval import ToolApprovalManager
@@ -21,19 +22,24 @@ class AgentCLI:
     def __init__(
         self,
         model: str,
+        provider: str,
         client: ChatClient,
         tools: ToolRegistry,
         approval_mgr: ToolApprovalManager,
         options: Optional[Dict[str, Any]] = None,
         use_color: Optional[bool] = None,
+        session_dir: Optional[Path] = None,
     ) -> None:
         self.model = model
+        self.provider = provider
         self.client = client
         self.tools = tools
         self.approval_mgr = approval_mgr
         self.options = options or {}
         self.system_prompt = self._build_system_prompt()
         self._use_color = sys.stdout.isatty() if use_color is None else use_color
+        self.session_dir = Path(session_dir) if session_dir else Path.cwd() / "sessions"
+        self.conversation: List[Dict[str, Any]] = []
 
     def _label(self, label: str, color: str) -> str:
         if not self._use_color:
@@ -59,10 +65,10 @@ class AgentCLI:
         return instructions
 
     def start(self, initial_message: Optional[str] = None) -> None:
-        conversation: List[Dict[str, Any]] = [{"role": "system", "content": self.system_prompt}]
+        self.conversation = [{"role": "system", "content": self.system_prompt}]
         if initial_message:
-            conversation.append({"role": "user", "content": initial_message})
-            self._agent_turn(conversation)
+            self.conversation.append({"role": "user", "content": initial_message})
+            self._agent_turn()
         while True:
             try:
                 user_label = self._label("you>", self.COLOR_USER)
@@ -72,18 +78,25 @@ class AgentCLI:
                 return
             if not user_input.strip():
                 continue
-            if user_input.strip().lower() in {"exit", "quit"}:
+            stripped = user_input.strip()
+            if stripped.startswith("/"):
+                result = self._handle_system_command(stripped)
+                if result == "exit":
+                    print("Bye.")
+                    return
+                continue
+            if stripped.lower() in {"exit", "quit"}:
                 print("Bye.")
                 return
-            conversation.append({"role": "user", "content": user_input})
-            self._agent_turn(conversation)
+            self.conversation.append({"role": "user", "content": user_input})
+            self._agent_turn()
 
-    def _agent_turn(self, conversation: List[Dict[str, Any]]) -> None:
+    def _agent_turn(self) -> None:
         while True:
-            assistant_reply = self._stream_response(conversation)
+            assistant_reply = self._stream_response(self.conversation)
             if assistant_reply is None:
                 return
-            conversation.append({"role": "assistant", "content": assistant_reply})
+            self.conversation.append({"role": "assistant", "content": assistant_reply})
             tool_call = self._parse_tool_call(assistant_reply)
             if not tool_call:
                 break
@@ -93,12 +106,12 @@ class AgentCLI:
                 print("[tool skipped] execution denied by user")
                 denial = "Tool execution denied by user."
                 wrapped_result = self._format_tool_result(tool_name, denial)
-                conversation.append({"role": "user", "content": wrapped_result})
+                self.conversation.append({"role": "user", "content": wrapped_result})
                 continue
             tool_result = self.tools.execute(tool_name, tool_args)
             print(f"[tool result]\n{tool_result}\n")
             wrapped_result = self._format_tool_result(tool_name, tool_result)
-            conversation.append({"role": "user", "content": wrapped_result})
+            self.conversation.append({"role": "user", "content": wrapped_result})
 
     def _stream_response(self, conversation: List[Dict[str, Any]]) -> Optional[str]:
         agent_label = self._label("agent>", self.COLOR_AGENT)
@@ -203,6 +216,106 @@ class AgentCLI:
         if decision == "a":
             self.approval_mgr.approve_always(name)
         return True
+
+    def _handle_system_command(self, command: str) -> Optional[str]:
+        parts = command.split(maxsplit=1)
+        name = parts[0].lower()
+        argument = parts[1].strip() if len(parts) > 1 else ""
+        if name == "/exit":
+            return "exit"
+        if name == "/help":
+            self._print_help()
+            return None
+        if name == "/save":
+            if not argument:
+                print("Usage: /save <name>")
+                return None
+            self._save_session(argument)
+            return None
+        if name == "/load":
+            if not argument:
+                print("Usage: /load <name>")
+                return None
+            self._load_session(argument)
+            return None
+        if name == "/info":
+            self._session_info()
+            return None
+        print("Unknown command. Type /help for a list of commands.")
+        return None
+
+    def _print_help(self) -> None:
+        print("Available commands:")
+        print("  /help           Show this help message")
+        print("  /info           Display model and session statistics")
+        print("  /save <name>    Save the current session to <name>.json")
+        print("  /load <name>    Load a saved session from <name>.json")
+        print("  /exit           Exit the program")
+
+    def _save_session(self, raw_name: str) -> None:
+        name = self._sanitize_session_name(raw_name)
+        if not name:
+            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
+            return
+        self.session_dir.mkdir(parents=True, exist_ok=True)
+        path = self.session_dir / f"{name}.json"
+        payload = {"conversation": self.conversation}
+        try:
+            with path.open("w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, indent=2)
+        except OSError as exc:
+            print(f"Failed to save session: {exc}")
+            return
+        print(f"Session saved to {path}")
+
+    def _load_session(self, raw_name: str) -> None:
+        name = self._sanitize_session_name(raw_name)
+        if not name:
+            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
+            return
+        path = self.session_dir / f"{name}.json"
+        if not path.exists():
+            print(f"Session '{name}' not found at {path}")
+            return
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"Failed to load session: {exc}")
+            return
+        conversation = data.get("conversation")
+        if not isinstance(conversation, list):
+            print("Invalid session file format.")
+            return
+        # Ensure current system prompt is applied
+        if conversation and conversation[0].get("role") == "system":
+            conversation[0]["content"] = self.system_prompt
+        else:
+            conversation.insert(0, {"role": "system", "content": self.system_prompt})
+        self.conversation = conversation
+        print(f"Session '{name}' loaded. Conversation length: {len(self.conversation)} messages.")
+
+    def _session_info(self) -> None:
+        message_count = len(self.conversation)
+        approx_tokens = self._estimate_tokens()
+        print(f"Provider: {self.provider}")
+        print(f"Model: {self.model}")
+        print(f"Messages in session: {message_count}")
+        print(f"Approximate tokens: {approx_tokens}")
+
+    def _estimate_tokens(self) -> int:
+        total_words = 0
+        for message in self.conversation:
+            content = message.get("content")
+            if not content:
+                continue
+            total_words += len(content.split())
+        return total_words
+
+    @staticmethod
+    def _sanitize_session_name(name: str) -> str:
+        sanitized = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.strip())
+        return sanitized.strip("_")
 
     def _prompt_tool_consent(self, name: str, args: Dict[str, Any]) -> str:
         pretty_args = json.dumps(args, indent=2, sort_keys=True)

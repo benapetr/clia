@@ -76,7 +76,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     search_config = resolve_search_config(config)
     tools = build_tools(shell_timeout=args.shell_timeout, search_config=search_config)
     approval_mgr = ToolApprovalManager(config_dir)
-    settings = resolve_client_settings(args, config_dir, config)
+    settings = resolve_client_settings(args, config)
     client = create_client(
         provider=settings.provider,
         endpoint=settings.endpoint,
@@ -85,18 +85,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     agent = AgentCLI(
         model=settings.model,
+        provider=settings.provider,
         client=client,
         tools=tools,
         approval_mgr=approval_mgr,
         options={"temperature": settings.temperature},
         use_color=False if args.no_color else None,
+        session_dir=config_dir / "sessions",
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
     return 0
 
 
-def resolve_client_settings(args: argparse.Namespace, config_dir: Path, config: ConfigParser) -> ClientSettings:
+def resolve_client_settings(args: argparse.Namespace, config: ConfigParser) -> ClientSettings:
     section = config["model"] if config.has_section("model") else None
 
     provider = (args.provider or (section.get("provider") if section else None) or "ollama").lower()

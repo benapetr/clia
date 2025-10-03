@@ -111,6 +111,12 @@ While the program is running:
 - Enter `exit` or press `Ctrl+D` to quit.
 - When the model decides to use a tool, the CLI displays the call and its result before continuing the chat; agent output is prefixed with a cyan `agent>` label (plain when `--no-color` is active).
 - For models that emit `<think>...</think>` meta tags, the content inside the tags is rendered in light gray to distinguish reasoning from the final answer (colorized output only).
+- System commands start with `/` and are handled locally:
+  - `/help` – list available commands
+  - `/info` – show provider/model and an approximate session token count
+  - `/save <name>` – save the current dialogue to `<config-dir>/sessions/<name>.json`
+  - `/load <name>` – restore a saved dialogue
+  - `/exit` – exit immediately
 
 ## Tool Approval Workflow
 
