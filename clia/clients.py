@@ -10,6 +10,12 @@ except ImportError:  # pragma: no cover - keep behavior aligned with other modul
 
 
 class ChatClient:
+    def __init__(self) -> None:
+        self.last_usage: Optional[Dict[str, int]] = None
+
+    def reset_usage(self) -> None:
+        self.last_usage = None
+
     def chat_stream(
         self,
         model: str,
@@ -18,11 +24,15 @@ class ChatClient:
     ) -> Iterable[str]:
         raise NotImplementedError
 
+    def get_last_usage(self) -> Optional[Dict[str, int]]:
+        return self.last_usage
+
 
 class OllamaClient(ChatClient):
     def __init__(self, base_url: str, timeout: int = 120) -> None:
         if not requests:
             raise RuntimeError("The 'requests' package is required to use OllamaClient")
+        super().__init__()
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -32,6 +42,7 @@ class OllamaClient(ChatClient):
         messages: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None,
     ) -> Iterable[str]:
+        self.reset_usage()
         url = f"{self.base_url}/api/chat"
         payload: Dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         if options:
@@ -56,6 +67,9 @@ class OllamaClient(ChatClient):
             if content:
                 yield content
             if data.get("done", False):
+                usage = _parse_ollama_usage(data)
+                if usage:
+                    self.last_usage = usage
                 break
 
     def _chat_via_generate(
@@ -85,6 +99,9 @@ class OllamaClient(ChatClient):
             if chunk:
                 yield chunk
             if data.get("done", False):
+                usage = _parse_ollama_usage(data)
+                if usage:
+                    self.last_usage = usage
                 break
 
 
@@ -94,6 +111,7 @@ class OpenAIClient(ChatClient):
             raise RuntimeError("The 'requests' package is required to use OpenAIClient")
         if not api_key:
             raise ValueError("OpenAI API key is required")
+        super().__init__()
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
@@ -104,6 +122,7 @@ class OpenAIClient(ChatClient):
         messages: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None,
     ) -> Iterable[str]:
+        self.reset_usage()
         url = f"{self.base_url}/chat/completions"
         payload: Dict[str, Any] = {
             "model": model,
@@ -133,6 +152,7 @@ class MistralClient(ChatClient):
             raise RuntimeError("The 'requests' package is required to use MistralClient")
         if not api_key:
             raise ValueError("Mistral API key is required")
+        super().__init__()
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
@@ -143,6 +163,7 @@ class MistralClient(ChatClient):
         messages: List[Dict[str, Any]],
         options: Optional[Dict[str, Any]] = None,
     ) -> Iterable[str]:
+        self.reset_usage()
         url = f"{self.base_url}/chat/completions"
         payload: Dict[str, Any] = {
             "model": model,
@@ -240,3 +261,16 @@ def _messages_to_prompt(messages: List[Dict[str, Any]]) -> str:
             parts.append(f"User: {content}")
     parts.append("Assistant:")
     return "\n\n".join(parts)
+
+
+def _parse_ollama_usage(data: Dict[str, Any]) -> Optional[Dict[str, int]]:
+    prompt_tokens = int(data.get("prompt_eval_count", 0) or 0)
+    completion_tokens = int(data.get("eval_count", 0) or 0)
+    total_tokens = prompt_tokens + completion_tokens
+    if total_tokens == 0:
+        return None
+    return {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }

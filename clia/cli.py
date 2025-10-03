@@ -43,6 +43,11 @@ class AgentCLI:
         self.session_dir = Path(session_dir) if session_dir else Path.cwd() / "sessions"
         self.conversation: List[Dict[str, Any]] = []
         self.command_registry = build_default_registry()
+        self.usage_totals = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
 
     def _label(self, label: str, color: str) -> str:
         if not self._use_color:
@@ -67,8 +72,32 @@ class AgentCLI:
         ).strip()
         return instructions
 
+    def _reset_usage_totals(self) -> None:
+        self.usage_totals = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    def _register_usage(self, usage: Dict[str, Any]) -> None:
+        for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+            if key in usage and usage[key] is not None:
+                try:
+                    value = int(usage.get(key, 0) or 0)
+                except (TypeError, ValueError):
+                    continue
+                self.usage_totals[key] = self.usage_totals.get(key, 0) + value
+
+    def _recalculate_usage_totals(self) -> None:
+        self._reset_usage_totals()
+        for message in self.conversation:
+            usage = message.get("usage") if isinstance(message, dict) else None
+            if isinstance(usage, dict):
+                self._register_usage(usage)
+
     def start(self, initial_message: Optional[str] = None) -> None:
         self.conversation = [{"role": "system", "content": self.system_prompt}]
+        self._reset_usage_totals()
         if initial_message:
             self.conversation.append({"role": "user", "content": initial_message})
             self._agent_turn()
@@ -96,10 +125,15 @@ class AgentCLI:
 
     def _agent_turn(self) -> None:
         while True:
-            assistant_reply = self._stream_response(self.conversation)
-            if assistant_reply is None:
+            result = self._stream_response(self.conversation)
+            if result is None:
                 return
-            self.conversation.append({"role": "assistant", "content": assistant_reply})
+            assistant_reply, usage = result
+            assistant_message: Dict[str, Any] = {"role": "assistant", "content": assistant_reply}
+            if usage:
+                assistant_message["usage"] = usage
+                self._register_usage(usage)
+            self.conversation.append(assistant_message)
             tool_call = self._parse_tool_call(assistant_reply)
             if not tool_call:
                 break
@@ -116,12 +150,15 @@ class AgentCLI:
             wrapped_result = self._format_tool_result(tool_name, tool_result)
             self.conversation.append({"role": "user", "content": wrapped_result})
 
-    def _stream_response(self, conversation: List[Dict[str, Any]]) -> Optional[str]:
+    def _stream_response(
+        self, conversation: List[Dict[str, Any]]
+    ) -> Optional[Tuple[str, Optional[Dict[str, int]]]]:
         agent_label = self._label("agent>", self.COLOR_AGENT)
         print(f"{agent_label} ", end="", flush=True)
         chunks: List[str] = []
         buffer = ""
         in_think = False
+        usage_info: Optional[Dict[str, int]] = None
         try:
             for delta in self.client.chat_stream(self.model, conversation, self.options):
                 to_print, buffer, in_think = self._render_think_chunk(delta, buffer, in_think)
@@ -135,7 +172,19 @@ class AgentCLI:
             print(f"\n[error] {exc}")
             return None
         print()
-        return "".join(chunks).strip()
+        getter = getattr(self.client, "get_last_usage", None)
+        latest_usage = getter() if callable(getter) else getattr(self.client, "last_usage", None)
+        if isinstance(latest_usage, dict):
+            usage_info = {}
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                if key in latest_usage:
+                    try:
+                        usage_info[key] = int(latest_usage[key])
+                    except (TypeError, ValueError):
+                        continue
+            if not usage_info:
+                usage_info = None
+        return "".join(chunks).strip(), usage_info
 
     def _render_think_chunk(
         self,
@@ -254,15 +303,24 @@ class AgentCLI:
         else:
             conversation.insert(0, {"role": "system", "content": self.system_prompt})
         self.conversation = conversation
+        self._recalculate_usage_totals()
         print(f"Session loaded from {path}. Conversation length: {len(self.conversation)} messages.")
 
     def session_info(self) -> None:
         message_count = len(self.conversation)
-        approx_tokens = self.estimate_tokens()
+        prompt_tokens = self.usage_totals.get("prompt_tokens", 0)
+        completion_tokens = self.usage_totals.get("completion_tokens", 0)
+        total_tokens = self.usage_totals.get("total_tokens", 0)
         print(f"Provider: {self.provider}")
         print(f"Model: {self.model}")
         print(f"Messages in session: {message_count}")
-        print(f"Approximate tokens: {approx_tokens}")
+        if total_tokens:
+            print(f"Prompt tokens: {prompt_tokens}")
+            print(f"Completion tokens: {completion_tokens}")
+            print(f"Total tokens: {total_tokens}")
+        else:
+            approx_tokens = self.estimate_tokens()
+            print(f"Approximate tokens: {approx_tokens}")
 
     def estimate_tokens(self) -> int:
         total_words = 0
