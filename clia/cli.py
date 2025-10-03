@@ -32,6 +32,7 @@ class AgentCLI:
         options: Optional[Dict[str, Any]] = None,
         use_color: Optional[bool] = None,
         session_dir: Optional[Path] = None,
+        system_prompt_template: Optional[str] = None,
     ) -> None:
         self.model = model
         self.provider = provider
@@ -39,6 +40,7 @@ class AgentCLI:
         self.tools = tools
         self.approval_mgr = approval_mgr
         self.options = options or {}
+        self.system_prompt_template = system_prompt_template
         self.system_prompt = self._build_system_prompt()
         self._use_color = sys.stdout.isatty() if use_color is None else use_color
         self.session_dir = Path(session_dir) if session_dir else Path.cwd() / "sessions"
@@ -57,6 +59,8 @@ class AgentCLI:
 
     def _build_system_prompt(self) -> str:
         tool_descriptions = self.tools.describe_for_prompt()
+        if self.system_prompt_template:
+            return self._render_system_prompt(self.system_prompt_template, tool_descriptions)
         instructions = textwrap.dedent(
             f"""
             You are an autonomous CLI agent. You may use the following tools when necessary:\n{tool_descriptions}\n\n"
@@ -72,6 +76,17 @@ class AgentCLI:
             """
         ).strip()
         return instructions
+
+    def _render_system_prompt(self, template: str, tool_descriptions: str) -> str:
+        replacements = {
+            "{{tools}}": tool_descriptions,
+            "{tools}": tool_descriptions,
+            "{tool_descriptions}": tool_descriptions,
+        }
+        result = template
+        for placeholder, value in replacements.items():
+            result = result.replace(placeholder, value)
+        return result.strip()
 
     def _reset_usage_totals(self) -> None:
         self.usage_totals = {

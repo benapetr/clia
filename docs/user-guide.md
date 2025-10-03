@@ -42,6 +42,7 @@ endpoint = http://localhost:11434
 api_key =                   # required for openai/mistral
 temperature = 0.7
 timeout = 120
+system_prompt = prompts/system-prompt.txt
 
 [search]
 provider = duckduckgo       # duckduckgo | google
@@ -56,6 +57,7 @@ Notes:
 - For Google Programmable Search Engine, set both `api_key` and `engine_id`.
 - DuckDuckGo search requires no API key but needs the `ddgs` Python package (installed earlier).
 - Set `storage.sessions_dir` to change where sessions are saved. Paths may be absolute and will expand `~`.
+- Provide `system_prompt` to point at a template file (absolute or relative to the config directory). Use `{tools}`, `{tool_descriptions}`, or `{{tools}}` inside the template to inject the current tool descriptions.
 
 ## 4. Running the Agent
 

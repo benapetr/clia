@@ -77,6 +77,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     search_config = resolve_search_config(config)
     tools = build_tools(shell_timeout=args.shell_timeout, search_config=search_config)
     approval_mgr = ToolApprovalManager(config_dir)
+    system_prompt_template = load_system_prompt_template(config_dir, config)
     settings = resolve_client_settings(args, config)
     client = create_client(
         provider=settings.provider,
@@ -93,6 +94,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         options={"temperature": settings.temperature},
         use_color=False if args.no_color else None,
         session_dir=save_dir,
+        system_prompt_template=system_prompt_template,
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
@@ -172,6 +174,27 @@ def resolve_save_dir(config_dir: Path, config: ConfigParser) -> Path:
         path = Path(configured).expanduser()
         return path
     return config_dir / "sessions"
+
+
+def load_system_prompt_template(config_dir: Path, config: ConfigParser) -> Optional[str]:
+    section: Optional[ConfigParser] = None
+    if config.has_section("model") and "system_prompt" in config["model"]:
+        section = config["model"]
+    elif config.has_section("prompts") and "system_prompt" in config["prompts"]:
+        section = config["prompts"]
+    if not section:
+        return None
+    value = section.get("system_prompt", "").strip()
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = config_dir / path
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exc:
+        print(f"[warning] Failed to read system prompt template '{path}': {exc}")
+        return None
 
 
 if __name__ == "__main__":

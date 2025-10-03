@@ -76,6 +76,7 @@ endpoint = http://localhost:11434
 api_key =                   # required for openai/mistral
 temperature = 0.7
 timeout = 120
+system_prompt = prompts/system-prompt.txt
 
 [search]
 provider = duckduckgo       # or google
@@ -91,6 +92,7 @@ CLI flags always take precedence over values loaded from `config.ini`. The endpo
 When `search.provider = google`, populate both `api_key` and `engine_id` with credentials for a Google Programmable Search Engine (Custom Search JSON API). DuckDuckGo requires no additional configuration.
 Set `storage.sessions_dir` to change where session files are stored; paths are expanded with `~` and may be absolute.
 DuckDuckGo searches depend on the optional `ddgs` package; install it alongside `requests` when using the default provider.
+Set `system_prompt` to the path of a template file (absolute or relative to the config directory). The template may include `{tools}`, `{tool_descriptions}`, or `{{tools}}` placeholders, which are replaced with the current tool list.
 
 ## Project Structure
 
