@@ -73,6 +73,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config = ConfigParser()
     config_path = config_dir / "config.ini"
     config.read(config_path)
+    save_dir = resolve_save_dir(config_dir, config)
     search_config = resolve_search_config(config)
     tools = build_tools(shell_timeout=args.shell_timeout, search_config=search_config)
     approval_mgr = ToolApprovalManager(config_dir)
@@ -91,7 +92,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         approval_mgr=approval_mgr,
         options={"temperature": settings.temperature},
         use_color=False if args.no_color else None,
-        session_dir=config_dir / "sessions",
+        session_dir=save_dir,
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
@@ -162,6 +163,15 @@ def resolve_search_config(config: ConfigParser) -> SearchConfig:
         google_api_key=google_api_key,
         google_engine_id=google_engine_id,
     )
+
+
+def resolve_save_dir(config_dir: Path, config: ConfigParser) -> Path:
+    section = config["storage"] if config.has_section("storage") else None
+    configured = section.get("sessions_dir") if section and "sessions_dir" in section else None
+    if configured:
+        path = Path(configured).expanduser()
+        return path
+    return config_dir / "sessions"
 
 
 if __name__ == "__main__":

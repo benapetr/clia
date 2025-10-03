@@ -47,11 +47,15 @@ timeout = 120
 provider = duckduckgo       # duckduckgo | google
 api_key =                   # required when provider = google
 engine_id =                 # Google Programmable Search Engine ID
+
+[storage]
+sessions_dir = ~/.config/clia/sessions
 ```
 Notes:
 - The CLI flags always override values from `config.ini`.
 - For Google Programmable Search Engine, set both `api_key` and `engine_id`.
 - DuckDuckGo search requires no API key but needs the `ddgs` Python package (installed earlier).
+- Set `storage.sessions_dir` to change where sessions are saved. Paths may be absolute and will expand `~`.
 
 ## 4. Running the Agent
 
@@ -81,8 +85,10 @@ python3 agent_cli.py --provider openai --model gpt-4o-mini --api-key "$OPENAI_AP
 Inputs starting with `/` are handled locally (not sent to the model). Built-in commands:
 - `/help` – list available commands
 - `/info` – display current provider/model and approximate session token usage
-- `/save <name>` – save the conversation to `<config-dir>/sessions/<name>.json`
-- `/load <name>` – load a previous session from that directory
+- `/save <name|path>` – save the conversation to the configured sessions directory or an explicit path
+- `/load <name|path>` – load a previous session using a name or direct file path
+- `/ls` – list saved sessions in the configured directory
+- `/rm <name|path>` – delete a saved session file
 - `/exit` – exit immediately
 
 ### Tool Permissions

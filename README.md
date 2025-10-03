@@ -81,11 +81,15 @@ timeout = 120
 provider = duckduckgo       # or google
 api_key =                   # required when provider = google
 engine_id =                 # Google Programmable Search Engine ID (cx)
+
+[storage]
+sessions_dir = ~/.config/clia/sessions
 ```
 
 CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
 
 When `search.provider = google`, populate both `api_key` and `engine_id` with credentials for a Google Programmable Search Engine (Custom Search JSON API). DuckDuckGo requires no additional configuration.
+Set `storage.sessions_dir` to change where session files are stored; paths are expanded with `~` and may be absolute.
 DuckDuckGo searches depend on the optional `ddgs` package; install it alongside `requests` when using the default provider.
 
 ## Project Structure
@@ -115,8 +119,10 @@ While the program is running:
 - System commands start with `/` and are handled locally:
   - `/help` – list available commands
   - `/info` – show provider/model and an approximate session token count
-  - `/save <name>` – save the current dialogue to `<config-dir>/sessions/<name>.json`
-  - `/load <name>` – restore a saved dialogue
+  - `/save <name|path>` – save the current dialogue to the configured sessions directory or a specific path
+  - `/load <name|path>` – restore a saved dialogue from the configured directory or an explicit path
+  - `/ls` – list saved session files in the configured directory
+  - `/rm <name|path>` – delete a saved session file
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow

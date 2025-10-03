@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import textwrap
@@ -220,12 +221,10 @@ class AgentCLI:
         return True
 
     def save_session(self, raw_name: str) -> None:
-        name = self._sanitize_session_name(raw_name)
-        if not name:
-            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
+        path = self._resolve_save_path(raw_name)
+        if path is None:
             return
-        self.session_dir.mkdir(parents=True, exist_ok=True)
-        path = self.session_dir / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"conversation": self.conversation}
         try:
             with path.open("w", encoding="utf-8") as handle:
@@ -236,13 +235,8 @@ class AgentCLI:
         print(f"Session saved to {path}")
 
     def load_session(self, raw_name: str) -> None:
-        name = self._sanitize_session_name(raw_name)
-        if not name:
-            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
-            return
-        path = self.session_dir / f"{name}.json"
-        if not path.exists():
-            print(f"Session '{name}' not found at {path}")
+        path = self._resolve_load_path(raw_name)
+        if path is None:
             return
         try:
             with path.open("r", encoding="utf-8") as handle:
@@ -260,7 +254,7 @@ class AgentCLI:
         else:
             conversation.insert(0, {"role": "system", "content": self.system_prompt})
         self.conversation = conversation
-        print(f"Session '{name}' loaded. Conversation length: {len(self.conversation)} messages.")
+        print(f"Session loaded from {path}. Conversation length: {len(self.conversation)} messages.")
 
     def session_info(self) -> None:
         message_count = len(self.conversation)
@@ -279,10 +273,80 @@ class AgentCLI:
             total_words += len(content.split())
         return total_words
 
+    def list_sessions(self) -> None:
+        directory = self.session_dir
+        if not directory.exists():
+            print(f"Save directory '{directory}' does not exist.")
+            return
+        entries = sorted(directory.glob("*.json"))
+        if not entries:
+            print("No saved sessions found.")
+            return
+        print(f"Saved sessions in {directory}:")
+        for entry in entries:
+            size = entry.stat().st_size
+            print(f"  {entry.name}  ({size} bytes)")
+
+    def remove_session(self, raw_name: str) -> None:
+        path = self._resolve_load_path(raw_name)
+        if path is None:
+            return
+        try:
+            path.unlink()
+        except OSError as exc:
+            print(f"Failed to remove session: {exc}")
+            return
+        print(f"Removed session file {path}")
+
     @staticmethod
     def _sanitize_session_name(name: str) -> str:
         sanitized = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.strip())
         return sanitized.strip("_")
+
+    def _resolve_save_path(self, raw_name: str) -> Optional[Path]:
+        raw_name = raw_name.strip()
+        if not raw_name:
+            print("Usage: /save <name or path>")
+            return None
+        if os.path.isabs(raw_name) or raw_name.endswith(".json") or any(sep in raw_name for sep in ("/", "\\")):
+            path = Path(raw_name).expanduser()
+            if path.is_dir():
+                print("Cannot save to a directory. Provide a file path.")
+                return None
+            if path.suffix != ".json":
+                path = path.with_suffix(".json")
+            return path
+        name = self._sanitize_session_name(raw_name)
+        if not name:
+            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
+            return None
+        return self.session_dir / f"{name}.json"
+
+    def _resolve_load_path(self, raw_name: str) -> Optional[Path]:
+        raw_name = raw_name.strip()
+        if not raw_name:
+            print("Usage: /load <name or path>")
+            return None
+        candidate = Path(raw_name).expanduser()
+        if candidate.exists() and candidate.is_file():
+            return candidate
+        if os.path.isabs(raw_name) or any(sep in raw_name for sep in ("/", "\\")):
+            if candidate.exists():
+                if candidate.is_dir():
+                    print("Path points to a directory, not a file.")
+                    return None
+                return candidate
+            print(f"Session file '{candidate}' not found.")
+            return None
+        name = self._sanitize_session_name(raw_name)
+        if not name:
+            print("Invalid session name. Use letters, numbers, hyphen, or underscore.")
+            return None
+        path = self.session_dir / f"{name}.json"
+        if not path.exists():
+            print(f"Session '{name}' not found at {path}")
+            return None
+        return path
 
     def _prompt_tool_consent(self, name: str, args: Dict[str, Any]) -> str:
         pretty_args = json.dumps(args, indent=2, sort_keys=True)
