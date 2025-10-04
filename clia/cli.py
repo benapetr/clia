@@ -159,25 +159,26 @@ class AgentCLI:
                 self._register_usage(usage)
             self.conversation.append(assistant_message)
             self._debug_record_message("assistant", assistant_reply)
-            tool_call = self._parse_tool_call(assistant_reply)
-            if not tool_call:
+            tool_calls = self._parse_tool_calls(assistant_reply)
+            if not tool_calls:
                 break
-            tool_name, tool_args = tool_call
-            print(f"\n[tool call] {tool_name} {tool_args}")
-            self._debug_record("tool_call", {"name": tool_name, "args": tool_args})
-            if not self._approve_tool_run(tool_name, tool_args):
-                print("[tool skipped] execution denied by user")
-                denial = "Tool execution denied by user."
-                wrapped_result = self._format_tool_result(tool_name, denial)
+            for tool_name, tool_args in tool_calls:
+                print(f"\n[tool call] {tool_name} {tool_args}")
+                self._debug_record("tool_call", {"name": tool_name, "args": tool_args})
+                if not self._approve_tool_run(tool_name, tool_args):
+                    print("[tool skipped] execution denied by user")
+                    denial = "Tool execution denied by user."
+                    wrapped_result = self._format_tool_result(tool_name, denial)
+                    self.conversation.append({"role": "user", "content": wrapped_result})
+                    self._debug_record("tool_denied", {"name": tool_name})
+                    continue
+                tool_result = self.tools.execute(tool_name, tool_args)
+                print(f"[tool result]\n{tool_result}\n")
+                self._debug_record("tool_result", {"name": tool_name, "result": tool_result})
+                wrapped_result = self._format_tool_result(tool_name, tool_result)
                 self.conversation.append({"role": "user", "content": wrapped_result})
-                self._debug_record("tool_denied", {"name": tool_name})
-                continue
-            tool_result = self.tools.execute(tool_name, tool_args)
-            print(f"[tool result]\n{tool_result}\n")
-            self._debug_record("tool_result", {"name": tool_name, "result": tool_result})
-            wrapped_result = self._format_tool_result(tool_name, tool_result)
-            self.conversation.append({"role": "user", "content": wrapped_result})
-            self._debug_record_message("tool_result", wrapped_result)
+                self._debug_record_message("tool_result", wrapped_result)
+            continue
 
     def _stream_response(
         self, conversation: List[Dict[str, Any]]
@@ -553,17 +554,17 @@ class AgentCLI:
                 return response
             print("Please respond with 'y', 'n', or 'a'.")
 
-    def _parse_tool_call(self, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
-        match = self.TOOL_CALL_PATTERN.search(message)
-        if not match:
-            return None
-        name = match.group("name")
-        raw_body = match.group("body")
-        try:
-            args = json.loads(raw_body)
-        except json.JSONDecodeError as exc:
-            return name, {"error": f"Invalid JSON arguments: {exc}"}
-        return name, args
+    def _parse_tool_calls(self, message: str) -> List[Tuple[str, Dict[str, Any]]]:
+        calls: List[Tuple[str, Dict[str, Any]]] = []
+        for match in self.TOOL_CALL_PATTERN.finditer(message):
+            name = match.group("name")
+            raw_body = match.group("body")
+            try:
+                args = json.loads(raw_body)
+            except json.JSONDecodeError as exc:
+                args = {"error": f"Invalid JSON arguments: {exc}"}
+            calls.append((name, args))
+        return calls
 
     @staticmethod
     def _format_tool_result(name: str, result: str) -> str:
