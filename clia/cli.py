@@ -12,7 +12,7 @@ from clia.approval import ToolApprovalManager
 from clia.clients import ChatClient
 from clia.commands import CommandOutcome, build_default_registry
 from clia.tooling import ToolRegistry
-from clia.utils import is_truncation_enabled, set_truncation_enabled
+from clia.utils import get_truncation_limit, is_truncation_enabled, set_truncation_enabled
 
 
 class AgentCLI:
@@ -373,7 +373,10 @@ class AgentCLI:
         else:
             approx_tokens = self.estimate_tokens()
             print(f"Approximate tokens: {approx_tokens}")
-        print(f"Truncation: {'on' if is_truncation_enabled() else 'off'}")
+        if is_truncation_enabled():
+            print(f"Truncation: on (limit: {get_truncation_limit()} chars)")
+        else:
+            print("Truncation: off")
         print(
             f"Debug: {'on' if self.debug_enabled else 'off'} (log file: {self.debug_log_path})"
         )

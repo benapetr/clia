@@ -15,6 +15,7 @@ from clia.cli import AgentCLI
 from clia.clients import create_client
 from clia.tools import build_tools
 from clia.tools.search_internet import SearchConfig
+from clia.utils import set_truncation_limit
 
 DEFAULT_ENDPOINTS: Dict[str, str] = {
     "ollama": "http://localhost:11434",
@@ -74,6 +75,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config = ConfigParser()
     config_path = config_dir / "config.ini"
     config.read(config_path)
+    apply_truncation_config(config)
     save_dir = resolve_save_dir(config_dir, config)
     debug_log_path = resolve_debug_log_path(config_dir, config)
     search_config = resolve_search_config(config)
@@ -159,6 +161,24 @@ def resolve_debug_log_path(config_dir: Path, config: ConfigParser) -> Path:
     if not path.is_absolute():
         path = config_dir / path
     return path
+
+
+def apply_truncation_config(config: ConfigParser) -> None:
+    section = config["output"] if config.has_section("output") else None
+    if not section:
+        return
+    value = section.get("truncation_limit")
+    if not value:
+        return
+    try:
+        limit = int(value)
+    except ValueError:
+        print(f"[warning] Invalid truncation_limit '{value}' in config.ini; ignoring.")
+        return
+    if limit <= 0:
+        print("[warning] truncation_limit must be positive; ignoring.")
+        return
+    set_truncation_limit(limit)
 
 
 def resolve_search_config(config: ConfigParser) -> SearchConfig:

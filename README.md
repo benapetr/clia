@@ -89,6 +89,9 @@ sessions_dir = ~/.config/clia/sessions
 
 [debug]
 log_file = /tmp/clia.log
+
+[output]
+truncation_limit = 4000
 ```
 
 CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
@@ -99,6 +102,7 @@ DuckDuckGo searches depend on the optional `ddgs` package; install it alongside 
 Set `system_prompt` to the path of a template file (absolute or relative to the config directory). The template may include `{tools}`, `{tool_descriptions}`, or `{{tools}}` placeholders, which are replaced with the current tool list.
 An example starter template lives at `docs/system-prompt-example.txt`.
 Use `[debug] log_file` to direct debug traces to a specific location (defaults to `/tmp/clia.log`).
+Use `[output] truncation_limit` to control how many characters tool outputs retain before truncation (default 4000).
 
 ## Project Structure
 

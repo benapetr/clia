@@ -54,6 +54,9 @@ sessions_dir = ~/.config/clia/sessions
 
 [debug]
 log_file = /tmp/clia.log
+
+[output]
+truncation_limit = 4000
 ```
 Notes:
 - The CLI flags always override values from `config.ini`.
@@ -63,6 +66,7 @@ Notes:
 - Provide `system_prompt` to point at a template file (absolute or relative to the config directory). Use `{tools}`, `{tool_descriptions}`, or `{{tools}}` inside the template to inject the current tool descriptions.
   See `docs/system-prompt-example.txt` for a starter template you can copy.
 - Use `[debug] log_file` to choose where debug traces are written (defaults to `/tmp/clia.log`).
+- Set `[output] truncation_limit` to adjust how many characters tool outputs keep before truncation (default 4000).
 
 ## 4. Running the Agent
 
