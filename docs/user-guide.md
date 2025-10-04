@@ -109,13 +109,14 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 When the model requests a tool that has not been pre-approved, the CLI prompts you to allow it once (`y`), deny it (`n`), or always (`a`). Permanent approvals are stored in `<config-dir>/allowed_tools`.
 
 ## 6. Default Tools
-The agent registers three tools by default:
+Tools registered by default:
 
-| Tool              | Description                                                                 |
-|-------------------|-----------------------------------------------------------------------------|
-| `run_shell`       | Execute shell commands in the repository workspace (timeout configurable). |
-| `read_url`        | Fetch webpage content and return a stripped text version.                   |
-| `search_internet` | Perform DuckDuckGo (via `ddgs`) or Google PSE search and return snippets.   |
+| Tool | Description |
+|------|-------------|
+| `run_shell` | Execute shell commands in the repository workspace (timeout configurable). |
+| `read_url` | Fetch webpage content, preserve links, and return a trimmed text summary. |
+| `search_internet` | Perform DuckDuckGo (via `ddgs`) or Google PSE search and return snippets. |
+| `bc` | Evaluate math expressions via the system `bc -l` calculator. |
 
 Extend `clia/tools/__init__.py` and add modules under `clia/tools/` to create new tools.
 

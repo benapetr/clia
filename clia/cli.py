@@ -74,6 +74,7 @@ class AgentCLI:
             "Do not include additional commentary when calling a tool.\n"
             "When you receive a tool result it will be wrapped in <tool_result name=\"...\"> tags.\n"
             "Continue the conversation after processing the tool result.\n"
+            "If the output of tool results wasn't sufficient to get all information needed to provide high quality answer, you may call another tool.\n"
             "When no tool is needed, respond directly to the user.\n"
             "If you need more information from the user, ask for it explicitly.\n"
             """

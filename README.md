@@ -147,13 +147,14 @@ While the program is running:
 
 ## Tooling
 
-Two tools are registered by default:
+Tools registered by default:
 
-| Tool       | Description                                                        | Arguments                               |
-|------------|--------------------------------------------------------------------|-----------------------------------------|
+| Tool | Description | Arguments |
+|------|-------------|-----------|
 | `run_shell` | Execute shell commands inside the project workspace (timeout configurable via `--shell-timeout`). | `{ "command": "<shell command string>" }` |
-| `read_url` | Fetch webpage text with HTML stripped, capped at 4,000 characters. | `{ "url": "https://example.com" }`        |
-| `search_internet` | Query the configured search provider (DuckDuckGo or Google PSE).    | `{ "query": "open source llm agents" }`    |
+| `read_url` | Fetch webpage text, preserve links, and return a trimmed plain-text summary. | `{ "url": "https://example.com" }` |
+| `search_internet` | Query the configured search provider (DuckDuckGo or Google PSE). | `{ "query": "open source llm agents" }` |
+| `bc` | Evaluate math expressions via the system `bc -l` calculator. | `{ "expression": "(2 + 2) * 3" }` |
 
 You can add more tools by extending `clia/tools/__init__.py`.
 
