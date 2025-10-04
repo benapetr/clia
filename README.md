@@ -6,6 +6,7 @@ An interactive command-line interface that lets an LLM act as a tool-using agent
 
 - Python 3.9+
 - `requests` Python package
+- `beautifulsoup4` Python package
 - `ddgs` Python package (required for DuckDuckGo search; optional if using Google only)
 - One of:
   - Local Ollama server running on `http://localhost:11434` (default)
@@ -17,7 +18,7 @@ An interactive command-line interface that lets an LLM act as a tool-using agent
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install requests ddgs
+pip install requests beautifulsoup4 ddgs
 ```
 
 ## Usage
