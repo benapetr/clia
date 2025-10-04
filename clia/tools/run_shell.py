@@ -32,7 +32,7 @@ def create_tool(shell_timeout: int = 60) -> Tool:
 
     return Tool(
         name="run_shell",
-        description=f"Execute a shell command inside the current workspace (timeout {shell_timeout}s).",
+        description=f"Execute a shell command inside the current workspace (timeout {shell_timeout}s). Commands are run in Linux environment and must not be interactive.",
         schema='{"command": "<shell command string>"}',
         handler=run,
     )
