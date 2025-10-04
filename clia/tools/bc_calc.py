@@ -15,7 +15,7 @@ def create_tool() -> Tool:
         try:
             completed = subprocess.run(
                 ["bc", "-l"],
-                input=expression,
+                input=(expression.strip() + "\n"),
                 text=True,
                 capture_output=True,
                 timeout=5,
