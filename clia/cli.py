@@ -428,7 +428,7 @@ class AgentCLI:
         try:
             parsed_args = json.loads(args_json) if args_json else {}
         except json.JSONDecodeError as exc:
-            print(f"Invalid JSON: {exc}")
+            print(f"Invalid JSON: {exc}. Example: {{\"query\": \"example\"}}")
             return
         if not isinstance(parsed_args, dict):
             print("Tool arguments must be a JSON object.")

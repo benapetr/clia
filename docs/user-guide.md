@@ -100,6 +100,9 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 - `/truncate on|off` – toggle global tool output truncation
 - `/debug [on|off]` – toggle or display debug logging status
 - `/debug_tool <tool> <json>` – execute a tool manually for debugging
+  Example:
+    `/debug_tool search_internet \"{\\"query\\": \\"format input data for fine tuning mistral model\\"}\"`
+    `/debug_tool run_shell \"{\\"command\\": \\"ls\\"}\"`
 - `/exit` – exit immediately
 
 ### Tool Permissions

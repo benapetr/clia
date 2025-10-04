@@ -135,6 +135,8 @@ While the program is running:
   - `/truncate on|off` – enable or disable tool output truncation globally
   - `/debug [on|off]` – toggle or display debug logging status (writes to the debug log file)
   - `/debug_tool <tool> <json>` – run a tool manually for debugging
+    Example: `/debug_tool search_internet \"{\\"query\\": \\"format input data for fine tuning mistral model\\"}\"`
+             `/debug_tool run_shell \"{\\"command\\": \\"ls\\"}\"`
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow
