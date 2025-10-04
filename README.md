@@ -159,6 +159,7 @@ Tools registered by default:
 | `read_url` | Fetch webpage text, preserve links, and return a trimmed plain-text summary. | `{ "url": "https://example.com" }` |
 | `search_internet` | Query the configured search provider (DuckDuckGo or Google PSE). | `{ "query": "open source llm agents" }` |
 | `bc` | Evaluate math expressions via the system `bc -l` calculator. | `{ "expression": "(2 + 2) * 3" }` |
+| `file_edit` | Modify files by writing, appending, or inserting text content. | `{ "path": "notes.txt", "mode": "append", "content": "More text" }` |
 
 You can add more tools by extending `clia/tools/__init__.py`.
 

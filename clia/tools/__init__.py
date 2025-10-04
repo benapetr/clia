@@ -10,6 +10,8 @@ from clia.tools.search_internet import (
     create_tool as create_search_internet_tool,
 )
 from clia.tools.bc_calc import create_tool as create_bc_tool
+from clia.tools.file_edit import create_tool as create_file_edit_tool
+from clia.tools.file_read import create_tool as create_file_read_tool
 
 
 def build_tools(shell_timeout: int = 60, search_config: Optional[SearchConfig] = None) -> ToolRegistry:
@@ -18,4 +20,6 @@ def build_tools(shell_timeout: int = 60, search_config: Optional[SearchConfig] =
     registry.register(create_read_url_tool())
     registry.register(create_search_internet_tool(search_config=search_config))
     registry.register(create_bc_tool())
+    registry.register(create_file_edit_tool())
+    registry.register(create_file_read_tool())
     return registry
