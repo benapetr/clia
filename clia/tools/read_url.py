@@ -5,16 +5,11 @@ from typing import Any, Dict
 from clia.tooling import Tool
 from clia.utils import strip_html, truncate
 
-try:
-    import requests
-except ImportError:  # pragma: no cover - keep consistent with overall behavior
-    requests = None  # type: ignore
+import requests
 
 
 def create_tool() -> Tool:
     def run(args: Dict[str, Any]) -> str:
-        if not requests:
-            return "ERROR: 'requests' package is unavailable"
         url = args.get("url")
         if not url:
             return "ERROR: 'url' argument is required"

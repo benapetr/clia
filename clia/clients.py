@@ -3,10 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Iterable, List, Optional
 
-try:
-    import requests
-except ImportError:  # pragma: no cover - keep behavior aligned with other modules
-    requests = None  # type: ignore
+import requests
 
 
 class ChatClient:
@@ -30,8 +27,6 @@ class ChatClient:
 
 class OllamaClient(ChatClient):
     def __init__(self, base_url: str, timeout: int = 120) -> None:
-        if not requests:
-            raise RuntimeError("The 'requests' package is required to use OllamaClient")
         super().__init__()
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -107,8 +102,6 @@ class OllamaClient(ChatClient):
 
 class OpenAIClient(ChatClient):
     def __init__(self, base_url: str, api_key: str, timeout: int = 120) -> None:
-        if not requests:
-            raise RuntimeError("The 'requests' package is required to use OpenAIClient")
         if not api_key:
             raise ValueError("OpenAI API key is required")
         super().__init__()
@@ -148,8 +141,6 @@ class OpenAIClient(ChatClient):
 
 class MistralClient(ChatClient):
     def __init__(self, base_url: str, api_key: str, timeout: int = 120) -> None:
-        if not requests:
-            raise RuntimeError("The 'requests' package is required to use MistralClient")
         if not api_key:
             raise ValueError("Mistral API key is required")
         super().__init__()

@@ -5,16 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from clia.tooling import Tool
 from clia.utils import truncate
-
-try:
-    import requests
-except ImportError:  # pragma: no cover - aligned with other tools
-    requests = None  # type: ignore
-
-try:
-    from ddgs import DDGS
-except ImportError:  # pragma: no cover - optional dependency
-    DDGS = None  # type: ignore
+import requests
+from ddgs import DDGS
 
 
 @dataclass
@@ -31,8 +23,6 @@ def create_tool(search_config: Optional[SearchConfig] = None) -> Tool:
         provider = "duckduckgo"
 
     def run(args: Dict[str, Any]) -> str:
-        if not requests:
-            return "ERROR: 'requests' package is unavailable"
         query = args.get("query")
         if not query:
             return "ERROR: 'query' argument is required"
@@ -74,8 +64,6 @@ def create_tool(search_config: Optional[SearchConfig] = None) -> Tool:
                 snippets.append(entry)
             return truncate("Search results:\n" + "\n".join(snippets))
         # default to DuckDuckGo
-        if DDGS is None:
-            return "ERROR: DuckDuckGo search requires the 'ddgs' package. Install it via 'pip install ddgs'."
         snippets: List[str] = []
         try:
             with DDGS() as ddgs_client:
