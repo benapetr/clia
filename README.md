@@ -1,4 +1,4 @@
-# Ollama Agent CLI
+# CLIA: Command Line Interface Agent
 
 An interactive command-line interface that lets an LLM act as a tool-using agent. The assistant can stream responses in real time and invoke registered tools—such as running shell commands or fetching webpage text—to complete tasks autonomously. By default the CLI targets a local Ollama instance, but it can also connect to OpenAI or Mistral endpoints.
 
