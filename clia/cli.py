@@ -33,6 +33,7 @@ class AgentCLI:
         use_color: Optional[bool] = None,
         session_dir: Optional[Path] = None,
         system_prompt_template: Optional[str] = None,
+        debug_log_path: Optional[Path] = None,
     ) -> None:
         self.model = model
         self.provider = provider
@@ -45,6 +46,8 @@ class AgentCLI:
         self._use_color = sys.stdout.isatty() if use_color is None else use_color
         self.session_dir = Path(session_dir) if session_dir else Path.cwd() / "sessions"
         self.conversation: List[Dict[str, Any]] = []
+        self.debug_log_path = Path(debug_log_path) if debug_log_path else Path("/tmp/clia.log")
+        self.debug_enabled = False
         self.command_registry = build_default_registry()
         self.usage_totals = {
             "prompt_tokens": 0,
@@ -114,8 +117,10 @@ class AgentCLI:
     def start(self, initial_message: Optional[str] = None) -> None:
         self.conversation = [{"role": "system", "content": self.system_prompt}]
         self._reset_usage_totals()
+        self._debug_record("system_prompt", {"content": self.system_prompt})
         if initial_message:
             self.conversation.append({"role": "user", "content": initial_message})
+            self._debug_record_message("user", initial_message)
             self._agent_turn()
         while True:
             try:
@@ -128,6 +133,7 @@ class AgentCLI:
                 continue
             stripped = user_input.strip()
             if stripped.startswith(self.command_registry.prefix):
+                self._debug_record("command", {"command": stripped})
                 outcome = self.command_registry.dispatch(stripped, self)
                 if outcome == CommandOutcome.EXIT:
                     print("Bye.")
@@ -137,6 +143,7 @@ class AgentCLI:
                 print("Bye.")
                 return
             self.conversation.append({"role": "user", "content": user_input})
+            self._debug_record_message("user", user_input)
             self._agent_turn()
 
     def _agent_turn(self) -> None:
@@ -150,21 +157,26 @@ class AgentCLI:
                 assistant_message["usage"] = usage
                 self._register_usage(usage)
             self.conversation.append(assistant_message)
+            self._debug_record_message("assistant", assistant_reply)
             tool_call = self._parse_tool_call(assistant_reply)
             if not tool_call:
                 break
             tool_name, tool_args = tool_call
             print(f"\n[tool call] {tool_name} {tool_args}")
+            self._debug_record("tool_call", {"name": tool_name, "args": tool_args})
             if not self._approve_tool_run(tool_name, tool_args):
                 print("[tool skipped] execution denied by user")
                 denial = "Tool execution denied by user."
                 wrapped_result = self._format_tool_result(tool_name, denial)
                 self.conversation.append({"role": "user", "content": wrapped_result})
+                self._debug_record("tool_denied", {"name": tool_name})
                 continue
             tool_result = self.tools.execute(tool_name, tool_args)
             print(f"[tool result]\n{tool_result}\n")
+            self._debug_record("tool_result", {"name": tool_name, "result": tool_result})
             wrapped_result = self._format_tool_result(tool_name, tool_result)
             self.conversation.append({"role": "user", "content": wrapped_result})
+            self._debug_record_message("tool_result", wrapped_result)
 
     def _stream_response(
         self, conversation: List[Dict[str, Any]]
@@ -175,6 +187,14 @@ class AgentCLI:
         buffer = ""
         in_think = False
         usage_info: Optional[Dict[str, int]] = None
+        self._debug_record(
+            "model_request",
+            {
+                "model": self.model,
+                "options": self.options,
+                "messages": [dict(message) for message in conversation],
+            },
+        )
         try:
             for delta in self.client.chat_stream(self.model, conversation, self.options):
                 to_print, buffer, in_think = self._render_think_chunk(delta, buffer, in_think)
@@ -186,6 +206,7 @@ class AgentCLI:
                 print(tail, end="", flush=True)
         except Exception as exc:
             print(f"\n[error] {exc}")
+            self._debug_record("model_error", {"error": str(exc)})
             return None
         print()
         getter = getattr(self.client, "get_last_usage", None)
@@ -200,7 +221,12 @@ class AgentCLI:
                         continue
             if not usage_info:
                 usage_info = None
-        return "".join(chunks).strip(), usage_info
+        reply = "".join(chunks).strip()
+        self._debug_record(
+            "model_response",
+            {"reply": reply, "chunks": chunks, "usage": usage_info},
+        )
+        return reply, usage_info
 
     def _render_think_chunk(
         self,
@@ -298,6 +324,10 @@ class AgentCLI:
             print(f"Failed to save session: {exc}")
             return
         print(f"Session saved to {path}")
+        self._debug_record(
+            "session_saved",
+            {"path": str(path), "messages": self._conversation_snapshot()},
+        )
 
     def load_session(self, raw_name: str) -> None:
         path = self._resolve_load_path(raw_name)
@@ -321,6 +351,10 @@ class AgentCLI:
         self.conversation = conversation
         self._recalculate_usage_totals()
         print(f"Session loaded from {path}. Conversation length: {len(self.conversation)} messages.")
+        self._debug_record(
+            "session_loaded",
+            {"path": str(path), "messages": self._conversation_snapshot()},
+        )
 
     def session_info(self) -> None:
         message_count = len(self.conversation)
@@ -338,6 +372,9 @@ class AgentCLI:
             approx_tokens = self.estimate_tokens()
             print(f"Approximate tokens: {approx_tokens}")
         print(f"Truncation: {'on' if is_truncation_enabled() else 'off'}")
+        print(
+            f"Debug: {'on' if self.debug_enabled else 'off'} (log file: {self.debug_log_path})"
+        )
 
     def estimate_tokens(self) -> int:
         total_words = 0
@@ -372,6 +409,7 @@ class AgentCLI:
             print(f"Failed to remove session: {exc}")
             return
         print(f"Removed session file {path}")
+        self._debug_record("session_removed", {"path": str(path)})
 
     def show_tail(self, count: int) -> None:
         relevant = self.conversation[-count:]
@@ -387,12 +425,58 @@ class AgentCLI:
         set_truncation_enabled(enabled)
         state = "enabled" if enabled else "disabled"
         print(f"Tool output truncation {state}.")
+        self._debug_record("truncate", {"enabled": enabled})
+
+    def set_debug(self, enabled: bool) -> None:
+        previous = self.debug_enabled
+        self.debug_enabled = enabled
+        state = "enabled" if enabled else "disabled"
+        print(f"Debug logging {state}. Log file: {self.debug_log_path}")
+        self._debug_record(
+            "debug_state",
+            {"enabled": enabled, "log_file": str(self.debug_log_path)},
+            force=True,
+        )
+        if enabled and not previous:
+            self._debug_dump_conversation()
+
+    def print_debug_status(self) -> None:
+        state = "on" if self.debug_enabled else "off"
+        print(f"Debug logging is {state}. Log file: {self.debug_log_path}")
 
     @staticmethod
     def _sanitize_session_name(name: str) -> str:
         sanitized = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.strip())
         return sanitized.strip("_")
 
+    def _debug_record(self, event: str, data: Dict[str, Any], *, force: bool = False) -> None:
+        if not (self.debug_enabled or force):
+            return
+        entry = {
+            "event": event,
+            "data": data,
+        }
+        try:
+            self.debug_log_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.debug_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, ensure_ascii=False))
+                handle.write("\n")
+        except OSError as exc:
+            print(f"[warning] Failed to write debug log: {exc}")
+            self.debug_enabled = False
+
+    def _conversation_snapshot(self) -> List[Dict[str, Any]]:
+        snapshot: List[Dict[str, Any]] = []
+        for message in self.conversation:
+            if isinstance(message, dict):
+                snapshot.append(dict(message))
+        return snapshot
+
+    def _debug_dump_conversation(self) -> None:
+        self._debug_record("conversation_snapshot", {"messages": self._conversation_snapshot()}, force=True)
+
+    def _debug_record_message(self, role: str, content: str) -> None:
+        self._debug_record("message", {"role": role, "content": content})
     def _resolve_save_path(self, raw_name: str) -> Optional[Path]:
         raw_name = raw_name.strip()
         if not raw_name:

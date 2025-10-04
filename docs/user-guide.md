@@ -51,6 +51,9 @@ engine_id =                 # Google Programmable Search Engine ID
 
 [storage]
 sessions_dir = ~/.config/clia/sessions
+
+[debug]
+log_file = /tmp/clia.log
 ```
 Notes:
 - The CLI flags always override values from `config.ini`.
@@ -59,6 +62,7 @@ Notes:
 - Set `storage.sessions_dir` to change where sessions are saved. Paths may be absolute and will expand `~`.
 - Provide `system_prompt` to point at a template file (absolute or relative to the config directory). Use `{tools}`, `{tool_descriptions}`, or `{{tools}}` inside the template to inject the current tool descriptions.
   See `docs/system-prompt-example.txt` for a starter template you can copy.
+- Use `[debug] log_file` to choose where debug traces are written (defaults to `/tmp/clia.log`).
 
 ## 4. Running the Agent
 
@@ -94,6 +98,7 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 - `/rm <name|path>` – delete a saved session file
 - `/tail [N]` – display the last `N` conversation messages (defaults to 5)
 - `/truncate on|off` – toggle global tool output truncation
+- `/debug [on|off]` – toggle or display debug logging status
 - `/exit` – exit immediately
 
 ### Tool Permissions

@@ -24,6 +24,7 @@ DEFAULT_ENDPOINTS: Dict[str, str] = {
 DEFAULT_MODEL = "qwen3:14b"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_TIMEOUT = 120
+DEFAULT_DEBUG_LOG = "/tmp/clia.log"
 
 
 @dataclass
@@ -74,6 +75,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_path = config_dir / "config.ini"
     config.read(config_path)
     save_dir = resolve_save_dir(config_dir, config)
+    debug_log_path = resolve_debug_log_path(config_dir, config)
     search_config = resolve_search_config(config)
     tools = build_tools(shell_timeout=args.shell_timeout, search_config=search_config)
     approval_mgr = ToolApprovalManager(config_dir)
@@ -95,6 +97,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         use_color=False if args.no_color else None,
         session_dir=save_dir,
         system_prompt_template=system_prompt_template,
+        debug_log_path=debug_log_path,
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
@@ -147,6 +150,15 @@ def resolve_client_settings(args: argparse.Namespace, config: ConfigParser) -> C
         temperature=temperature,
         timeout=timeout,
     )
+
+
+def resolve_debug_log_path(config_dir: Path, config: ConfigParser) -> Path:
+    section = config["debug"] if config.has_section("debug") else None
+    configured = section.get("log_file") if section and "log_file" in section else None
+    path = Path(configured).expanduser() if configured else Path(DEFAULT_DEBUG_LOG)
+    if not path.is_absolute():
+        path = config_dir / path
+    return path
 
 
 def resolve_search_config(config: ConfigParser) -> SearchConfig:

@@ -85,6 +85,9 @@ engine_id =                 # Google Programmable Search Engine ID (cx)
 
 [storage]
 sessions_dir = ~/.config/clia/sessions
+
+[debug]
+log_file = /tmp/clia.log
 ```
 
 CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
@@ -94,6 +97,7 @@ Set `storage.sessions_dir` to change where session files are stored; paths are e
 DuckDuckGo searches depend on the optional `ddgs` package; install it alongside `requests` when using the default provider.
 Set `system_prompt` to the path of a template file (absolute or relative to the config directory). The template may include `{tools}`, `{tool_descriptions}`, or `{{tools}}` placeholders, which are replaced with the current tool list.
 An example starter template lives at `docs/system-prompt-example.txt`.
+Use `[debug] log_file` to direct debug traces to a specific location (defaults to `/tmp/clia.log`).
 
 ## Project Structure
 
@@ -128,6 +132,7 @@ While the program is running:
   - `/rm <name|path>` – delete a saved session file
   - `/tail [N]` – print the last `N` conversation messages (default 5)
   - `/truncate on|off` – enable or disable tool output truncation globally
+  - `/debug [on|off]` – toggle or display debug logging status (writes to the debug log file)
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow
