@@ -134,6 +134,7 @@ While the program is running:
   - `/tail [N]` – print the last `N` conversation messages (default 5)
   - `/truncate on|off` – enable or disable tool output truncation globally
   - `/debug [on|off]` – toggle or display debug logging status (writes to the debug log file)
+  - `/debug_tool <tool> <json>` – run a tool manually for debugging
   - `/exit` – exit immediately
 
 ## Tool Approval Workflow

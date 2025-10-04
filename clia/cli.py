@@ -421,6 +421,23 @@ class AgentCLI:
             content = message.get("content", "")
             print(f"[{role}] {content}")
 
+    def debug_run_tool(self, name: str, args_json: str) -> None:
+        if not name:
+            print("Usage: /debug_tool <tool_name> <json_args>")
+            return
+        try:
+            parsed_args = json.loads(args_json) if args_json else {}
+        except json.JSONDecodeError as exc:
+            print(f"Invalid JSON: {exc}")
+            return
+        if not isinstance(parsed_args, dict):
+            print("Tool arguments must be a JSON object.")
+            return
+        result = self.tools.execute(name, parsed_args)
+        print(f"[tool {name}]")
+        print(result)
+        self._debug_record("debug_tool", {"name": name, "args": parsed_args, "result": result})
+
     def set_truncation(self, enabled: bool) -> None:
         set_truncation_enabled(enabled)
         state = "enabled" if enabled else "disabled"

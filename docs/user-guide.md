@@ -99,6 +99,7 @@ Inputs starting with `/` are handled locally (not sent to the model). Built-in c
 - `/tail [N]` – display the last `N` conversation messages (defaults to 5)
 - `/truncate on|off` – toggle global tool output truncation
 - `/debug [on|off]` – toggle or display debug logging status
+- `/debug_tool <tool> <json>` – execute a tool manually for debugging
 - `/exit` – exit immediately
 
 ### Tool Permissions
