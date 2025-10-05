@@ -92,6 +92,9 @@ log_file = /tmp/clia.log
 
 [output]
 truncation_limit = 4000
+
+[unsafe]
+enabled = off
 ```
 
 CLI flags always take precedence over values loaded from `config.ini`. The endpoint should be the base URL for the provider (e.g., `https://api.openai.com/v1`).
