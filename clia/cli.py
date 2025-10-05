@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import signal
 import sys
 import textwrap
 import time
@@ -65,6 +66,10 @@ class AgentCLI:
             "completion_tokens": 0,
             "total_tokens": 0,
         }
+        self.cancel_requested = False
+        self._sigint_registered = False
+        self._original_sigint = None
+        self._sigint_message_pending = False
 
     def _label(self, label: str, color: str) -> str:
         if not self._use_color:
@@ -127,41 +132,51 @@ class AgentCLI:
                 self._register_usage(usage)
 
     def start(self, initial_message: Optional[str] = None) -> None:
-        self.conversation = [{"role": "system", "content": self.system_prompt}]
-        self._reset_usage_totals()
-        self._debug_record("system_prompt", {"content": self.system_prompt})
-        if initial_message:
-            self.conversation.append({"role": "user", "content": initial_message})
-            self._debug_record_message("user", initial_message)
-            self._agent_turn()
-        while True:
-            try:
-                user_label = self._label("you>", self.COLOR_USER)
-                user_input = input(f"{user_label} ")
-            except (EOFError, KeyboardInterrupt):
-                print("\nExiting.")
-                return
-            if not user_input.strip():
-                continue
-            stripped = user_input.strip()
-            if stripped.startswith(self.command_registry.prefix):
-                self._debug_record("command", {"command": stripped})
-                outcome = self.command_registry.dispatch(stripped, self)
-                if outcome == CommandOutcome.EXIT:
+        self._install_signal_handler()
+        try:
+            self.conversation = [{"role": "system", "content": self.system_prompt}]
+            self._reset_usage_totals()
+            self._debug_record("system_prompt", {"content": self.system_prompt})
+            if initial_message:
+                self.conversation.append({"role": "user", "content": initial_message})
+                self._debug_record_message("user", initial_message)
+                self._agent_turn()
+            while True:
+                try:
+                    if self._sigint_message_pending:
+                        print("Interrupt requested. Waiting for current action to complete...")
+                        self._sigint_message_pending = False
+                    user_label = self._label("you>", self.COLOR_USER)
+                    user_input = input(f"{user_label} ")
+                except (EOFError, KeyboardInterrupt):
+                    print("\nExiting.")
+                    return
+                if not user_input.strip():
+                    continue
+                stripped = user_input.strip()
+                if stripped.startswith(self.command_registry.prefix):
+                    self._debug_record("command", {"command": stripped})
+                    outcome = self.command_registry.dispatch(stripped, self)
+                    if outcome == CommandOutcome.EXIT:
+                        print("Bye.")
+                        return
+                    continue
+                if stripped.lower() in {"exit", "quit"}:
                     print("Bye.")
                     return
-                continue
-            if stripped.lower() in {"exit", "quit"}:
-                print("Bye.")
-                return
-            self.conversation.append({"role": "user", "content": user_input})
-            self._debug_record_message("user", user_input)
-            self._agent_turn()
+                self.conversation.append({"role": "user", "content": user_input})
+                self._debug_record_message("user", user_input)
+                self._agent_turn()
+        finally:
+            self._restore_signal_handler()
 
     def _agent_turn(self) -> None:
         while True:
             if self.slomo_seconds > 0:
                 time.sleep(self.slomo_seconds)
+            if self._sigint_message_pending:
+                print("Interrupt requested. Waiting for current action to complete...")
+                self._sigint_message_pending = False
             result = self._stream_response(self.conversation)
             if result is None:
                 return
@@ -181,6 +196,10 @@ class AgentCLI:
                 self._register_usage(usage)
             self.conversation.append(assistant_message)
             self._debug_record_message("assistant", assistant_reply)
+            if self.cancel_requested:
+                if not self._handle_interrupt_prompt():
+                    self.conversation.pop()
+                    return
             tool_calls = self._parse_tool_calls(assistant_reply)
             if not tool_calls:
                 break
@@ -188,9 +207,10 @@ class AgentCLI:
             for tool_name, tool_args in tool_calls:
                 print(f"\n[tool call] {tool_name} {tool_args}")
                 self._debug_record("tool_call", {"name": tool_name, "args": tool_args})
-                if not self._approve_tool_run(tool_name, tool_args):
+                allowed, denial_message = self._approve_tool_run(tool_name, tool_args)
+                if not allowed:
                     print("[tool skipped] execution denied by user")
-                    denial = "Tool execution denied by user."
+                    denial = denial_message or "Tool execution denied by user."
                     wrapped_result = self._format_tool_result(tool_name, denial)
                     self.conversation.append({"role": "user", "content": wrapped_result})
                     self._debug_record("tool_denied", {"name": tool_name})
@@ -378,15 +398,21 @@ class AgentCLI:
             return
         print(f"[tool result]\n{output}\n")
 
-    def _approve_tool_run(self, name: str, args: Dict[str, Any]) -> bool:
+    def _approve_tool_run(self, name: str, args: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         if self.approval_mgr.is_approved(name):
-            return True
+            return True, None
         decision = self._prompt_tool_consent(name, args)
         if decision == "n":
-            return False
+            reason = input(
+                "Provide optional reason for the model (press Enter to skip): "
+            ).strip()
+            message = "Tool execution denied by user."
+            if reason:
+                message += f" Reason: {reason}"
+            return False, message
         if decision == "a":
             self.approval_mgr.approve_always(name)
-        return True
+        return True, None
 
     def save_session(self, raw_name: str) -> None:
         path = self._resolve_save_path(raw_name)
@@ -565,6 +591,29 @@ class AgentCLI:
     def show_unsafe(self) -> None:
         print(f"Unsafe mode is {'on' if self.unsafe_enabled else 'off'}.")
 
+    def _install_signal_handler(self) -> None:
+        if self._sigint_registered:
+            return
+        self._original_sigint = signal.getsignal(signal.SIGINT)
+        signal.signal(signal.SIGINT, self._handle_sigint)
+        self._sigint_registered = True
+
+    def _restore_signal_handler(self) -> None:
+        if not self._sigint_registered:
+            return
+        if self._original_sigint is not None:
+            signal.signal(signal.SIGINT, self._original_sigint)
+        self._sigint_registered = False
+
+    def _handle_sigint(self, signum, frame) -> None:
+        if self.cancel_requested:
+            if self._original_sigint is not None:
+                signal.signal(signal.SIGINT, self._original_sigint)
+            raise KeyboardInterrupt
+        self.cancel_requested = True
+        self._sigint_message_pending = True
+        print("\nCtrl+C received. Will prompt after the current action.")
+
     def dump_context(self, target_path: str | None = None) -> None:
         snapshot = self._conversation_snapshot()
         if not target_path:
@@ -614,6 +663,18 @@ class AgentCLI:
 
     def _debug_record_message(self, role: str, content: str) -> None:
         self._debug_record("message", {"role": role, "content": content})
+
+    def _handle_interrupt_prompt(self) -> bool:
+        while True:
+            choice = input("Interrupt detected. Continue? [c]ontinue/[a]bort: ").strip().lower()
+            if choice in {"", "c", "continue", "y", "yes"}:
+                self.cancel_requested = False
+                return True
+            if choice in {"a", "abort", "n", "no"}:
+                self.cancel_requested = False
+                print("Interrupt acknowledged. Returning to prompt.")
+                return False
+            print("Please respond with 'c' to continue or 'a' to abort.")
     def _resolve_save_path(self, raw_name: str) -> Optional[Path]:
         raw_name = raw_name.strip()
         if not raw_name:
