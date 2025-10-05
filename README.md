@@ -18,7 +18,7 @@ An interactive command-line interface that lets an LLM act as a tool-using agent
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install requests beautifulsoup4 ddgs
+pip install -r requirements.txt
 ```
 
 ## Usage

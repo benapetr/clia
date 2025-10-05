@@ -7,7 +7,7 @@ This guide explains how to install, configure, and run the CLI agent that turns 
 - **Python** 3.9 or newer
 - The following Python packages (install them into your virtual environment):
   ```bash
-  pip install requests beautifulsoup4 ddgs
+  pip install -r requirements.txt
   ```
   `requests` handles HTTP calls, `beautifulsoup4` extracts text from HTML, and `ddgs` powers DuckDuckGo search results.
 - At least one supported model provider:
@@ -25,7 +25,7 @@ This guide explains how to install, configure, and run the CLI agent that turns 
    ```
 3. Install dependencies inside the environment:
    ```bash
-   pip install requests beautifulsoup4 ddgs
+   pip install -r requirements.txt
    ```
 4. Ensure Ollama or the remote provider you plan to use is reachable.
 
