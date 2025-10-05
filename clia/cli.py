@@ -90,10 +90,11 @@ class AgentCLI:
             "Do not include additional commentary when calling a tool.\n"
             "IMPORTANT: Tools are always executed from same fixed working directory, that means cd (change directory) doesn't persist between tool calls. Use absolute paths where you can.\n"
             "When you receive a tool result it will be wrapped in <tool_result name=\"...\"> tags.\n"
-            "Continue the conversation after processing the tool result.\n"
+            "When you call any tool, you are going to be given the result immediately and if necessary you can directly call another tool.\n"
             "If the output of tool results wasn't sufficient to get all information needed to provide high quality answer, you may call another tool.\n"
+            "Keep in mind that you are not just a simple chatbot, you are autonomous agent tool, you can keep calling various tools as long as you need to achieve your objective.\n"
             "When no tool is needed, respond directly to the user.\n"
-            "If you need more information from the user, ask for it explicitly.\n"
+            "Continue the conversation after achieving the objective or if clarification or more information from user is needed.\n"
             """
         ).strip()
         return instructions
