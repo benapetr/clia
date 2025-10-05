@@ -106,6 +106,7 @@ Set `system_prompt` to the path of a template file (absolute or relative to the 
 An example starter template lives at `docs/system-prompt-example.txt`.
 Use `[debug] log_file` to direct debug traces to a specific location (defaults to `/tmp/clia.log`).
 Use `[output] truncation_limit` to control how many characters tool outputs retain before truncation (default 4000).
+System prompts support placeholders like `{tools}`, `{date}`, and `{time}` for dynamic context.
 
 ## Project Structure
 

@@ -7,6 +7,7 @@ import signal
 import sys
 import textwrap
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -81,8 +82,8 @@ class AgentCLI:
         if self.system_prompt_template:
             return self._render_system_prompt(self.system_prompt_template, tool_descriptions)
         instructions = textwrap.dedent(
-            f"""
-            You are an autonomous CLI agent. You may use the following tools when necessary:\n{tool_descriptions}\n\n"
+            """
+            You are an autonomous CLI agent. You may use the following tools when necessary:\n{tools}\n\n"
             "To call a tool respond with exactly:\n"
             "<tool name=\"{{tool_name}}\">\n"
             "{{JSON arguments}}\n"
@@ -94,21 +95,33 @@ class AgentCLI:
             "If the output of tool results wasn't sufficient to get all information needed to provide high quality answer, you may call another tool.\n"
             "Keep in mind that you are not just a simple chatbot, you are autonomous agent tool, you can keep calling various tools as long as you need to achieve your objective.\n"
             "When no tool is needed, respond directly to the user.\n"
-            "Continue the conversation after achieving the objective or if clarification or more information from user is needed.\n"
+            "Continue the conversation after achieving the objective or if clarification or more information from user is needed.\n\n"
+            "Context date: {date}\n"
+            "Context time: {time}\n"
             """
         ).strip()
-        return instructions
+        return self._apply_replacements(instructions, tool_descriptions)
 
     def _render_system_prompt(self, template: str, tool_descriptions: str) -> str:
+        return self._apply_replacements(template, tool_descriptions).strip()
+
+    def _apply_replacements(self, text: str, tool_descriptions: str) -> str:
+        now = datetime.now()
+        date_str = now.date().isoformat()
+        time_str = now.strftime("%H:%M:%S")
         replacements = {
             "{{tools}}": tool_descriptions,
             "{tools}": tool_descriptions,
             "{tool_descriptions}": tool_descriptions,
+            "{date}": date_str,
+            "{time}": time_str,
+            "{{date}}": date_str,
+            "{{time}}": time_str,
         }
-        result = template
+        result = text
         for placeholder, value in replacements.items():
             result = result.replace(placeholder, value)
-        return result.strip()
+        return result
 
     def _reset_usage_totals(self) -> None:
         self.usage_totals = {
