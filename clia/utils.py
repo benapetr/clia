@@ -3,6 +3,7 @@ from __future__ import annotations
 
 _TRUNCATION_ENABLED = True
 _TRUNCATION_LIMIT = 4000
+_UNSAFE_MODE = False
 
 
 def set_truncation_enabled(enabled: bool) -> None:
@@ -22,6 +23,15 @@ def set_truncation_limit(limit: int) -> None:
 
 def get_truncation_limit() -> int:
     return _TRUNCATION_LIMIT
+
+
+def set_unsafe_enabled(enabled: bool) -> None:
+    global _UNSAFE_MODE
+    _UNSAFE_MODE = bool(enabled)
+
+
+def is_unsafe_enabled() -> bool:
+    return _UNSAFE_MODE
 
 
 def truncate(text: str, limit: int | None = None) -> str:

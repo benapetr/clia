@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from clia.tooling import Tool
-from clia.utils import truncate
+from clia.utils import truncate, is_unsafe_enabled
 
 WORKSPACE_ROOT = Path.cwd().resolve()
 
@@ -85,6 +85,8 @@ def _resolve_path(raw_path: str) -> Path | None:
         resolved = candidate.resolve()
     except OSError:
         return None
+    if is_unsafe_enabled():
+        return resolved
     try:
         resolved.relative_to(WORKSPACE_ROOT)
     except ValueError:

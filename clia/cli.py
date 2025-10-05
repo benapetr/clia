@@ -13,7 +13,13 @@ from clia.approval import ToolApprovalManager
 from clia.clients import ChatClient
 from clia.commands import CommandOutcome, build_default_registry
 from clia.tooling import ToolRegistry
-from clia.utils import get_truncation_limit, is_truncation_enabled, set_truncation_enabled
+from clia.utils import (
+    get_truncation_limit,
+    is_truncation_enabled,
+    is_unsafe_enabled,
+    set_truncation_enabled,
+    set_unsafe_enabled,
+)
 
 
 class AgentCLI:
@@ -35,6 +41,7 @@ class AgentCLI:
         session_dir: Optional[Path] = None,
         system_prompt_template: Optional[str] = None,
         debug_log_path: Optional[Path] = None,
+        unsafe_default: bool = False,
     ) -> None:
         self.model = model
         self.provider = provider
@@ -50,6 +57,8 @@ class AgentCLI:
         self.debug_log_path = Path(debug_log_path) if debug_log_path else Path("/tmp/clia.log")
         self.debug_enabled = False
         self.slomo_seconds = 0.0
+        self.unsafe_enabled = bool(unsafe_default)
+        set_unsafe_enabled(self.unsafe_enabled)
         self.command_registry = build_default_registry()
         self.usage_totals = {
             "prompt_tokens": 0,
@@ -384,6 +393,7 @@ class AgentCLI:
         print(
             f"Debug: {'on' if self.debug_enabled else 'off'} (log file: {self.debug_log_path})"
         )
+        print(f"Unsafe mode: {'on' if self.unsafe_enabled else 'off'}")
 
     def estimate_tokens(self) -> int:
         total_words = 0
@@ -483,6 +493,15 @@ class AgentCLI:
             print(f"SloMo delay is {self.slomo_seconds} seconds between model calls.")
         else:
             print("SloMo is disabled.")
+
+    def set_unsafe(self, enabled: bool) -> None:
+        self.unsafe_enabled = bool(enabled)
+        set_unsafe_enabled(self.unsafe_enabled)
+        print(f"Unsafe mode {'enabled' if self.unsafe_enabled else 'disabled'}.")
+        self._debug_record("unsafe", {"enabled": self.unsafe_enabled})
+
+    def show_unsafe(self) -> None:
+        print(f"Unsafe mode is {'on' if self.unsafe_enabled else 'off'}.")
 
     def dump_context(self, target_path: str | None = None) -> None:
         snapshot = self._conversation_snapshot()

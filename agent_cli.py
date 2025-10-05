@@ -76,6 +76,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_path = config_dir / "config.ini"
     config.read(config_path)
     apply_truncation_config(config)
+    unsafe_enabled = resolve_unsafe_enabled(config)
     save_dir = resolve_save_dir(config_dir, config)
     debug_log_path = resolve_debug_log_path(config_dir, config)
     search_config = resolve_search_config(config)
@@ -100,6 +101,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         session_dir=save_dir,
         system_prompt_template=system_prompt_template,
         debug_log_path=debug_log_path,
+        unsafe_default=unsafe_enabled,
     )
     initial_message = " ".join(args.prompt).strip() if args.prompt else None
     agent.start(initial_message if initial_message else None)
@@ -161,6 +163,20 @@ def resolve_debug_log_path(config_dir: Path, config: ConfigParser) -> Path:
     if not path.is_absolute():
         path = config_dir / path
     return path
+
+
+def resolve_unsafe_enabled(config: ConfigParser) -> bool:
+    section = config["unsafe"] if config.has_section("unsafe") else None
+    value = section.get("enabled") if section else None
+    if value is None:
+        return False
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "on", "yes"}:
+        return True
+    if normalized in {"0", "false", "off", "no"}:
+        return False
+    print(f"[warning] Invalid unsafe.enabled value '{value}' in config.ini; defaulting to off.")
+    return False
 
 
 def apply_truncation_config(config: ConfigParser) -> None:
