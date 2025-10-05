@@ -466,6 +466,22 @@ class AgentCLI:
         state = "on" if self.debug_enabled else "off"
         print(f"Debug logging is {state}. Log file: {self.debug_log_path}")
 
+    def dump_context(self, target_path: str | None = None) -> None:
+        snapshot = self._conversation_snapshot()
+        if not target_path:
+            print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+            return
+        path = Path(target_path).expanduser()
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError as exc:
+            print(f"Failed to write context dump: {exc}")
+            return
+        print(f"Context dumped to {path}")
+
     @staticmethod
     def _sanitize_session_name(name: str) -> str:
         sanitized = re.sub(r"[^a-zA-Z0-9_\-]", "_", name.strip())
