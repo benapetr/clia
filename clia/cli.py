@@ -88,6 +88,7 @@ class AgentCLI:
             "{{JSON arguments}}\n"
             "</tool>\n\n"
             "Do not include additional commentary when calling a tool.\n"
+            "IMPORTANT: Tools are always executed from same fixed working directory, that means cd (change directory) doesn't persist between tool calls. Use absolute paths where you can.\n"
             "When you receive a tool result it will be wrapped in <tool_result name=\"...\"> tags.\n"
             "Continue the conversation after processing the tool result.\n"
             "If the output of tool results wasn't sufficient to get all information needed to provide high quality answer, you may call another tool.\n"

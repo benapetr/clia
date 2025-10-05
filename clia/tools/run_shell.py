@@ -80,7 +80,7 @@ def create_tool(shell_timeout: int = 60) -> Tool:
 
     return Tool(
         name="run_shell",
-        description=f"Execute a shell command inside the current workspace (timeout {shell_timeout}s). Commands are run in Linux environment and must not be interactive.",
+        description=f"Execute a shell command inside the current workspace (timeout {shell_timeout}s). Commands are run in Linux environment and must not be interactive. Commands are always executed from same fixed working directory, that means cd (change directory) doesn't persist across tool calls. Use absolute paths where you can. If you need to cd, make sure you use that same cd in every next instance of run_shell.",
         schema='{"command": "<shell command string>"}',
         handler=run,
     )
