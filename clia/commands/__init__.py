@@ -72,6 +72,7 @@ def build_default_registry(prefix: str = COMMAND_PREFIX) -> CommandRegistry:
         debug_cmd,
         debug_tool_cmd,
         context_dump_cmd,
+        slomo_cmd,
         truncate_cmd,
     )
 
@@ -86,5 +87,6 @@ def build_default_registry(prefix: str = COMMAND_PREFIX) -> CommandRegistry:
     debug_cmd.register(registry)
     debug_tool_cmd.register(registry)
     context_dump_cmd.register(registry)
+    slomo_cmd.register(registry)
     truncate_cmd.register(registry)
     return registry

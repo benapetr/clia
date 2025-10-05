@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import textwrap
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -48,6 +49,7 @@ class AgentCLI:
         self.conversation: List[Dict[str, Any]] = []
         self.debug_log_path = Path(debug_log_path) if debug_log_path else Path("/tmp/clia.log")
         self.debug_enabled = False
+        self.slomo_seconds = 0.0
         self.command_registry = build_default_registry()
         self.usage_totals = {
             "prompt_tokens": 0,
@@ -149,6 +151,8 @@ class AgentCLI:
 
     def _agent_turn(self) -> None:
         while True:
+            if self.slomo_seconds > 0:
+                time.sleep(self.slomo_seconds)
             result = self._stream_response(self.conversation)
             if result is None:
                 return
@@ -465,6 +469,20 @@ class AgentCLI:
     def print_debug_status(self) -> None:
         state = "on" if self.debug_enabled else "off"
         print(f"Debug logging is {state}. Log file: {self.debug_log_path}")
+
+    def set_slomo(self, seconds: float) -> None:
+        self.slomo_seconds = max(0.0, seconds)
+        if self.slomo_seconds:
+            print(f"SloMo delay set to {self.slomo_seconds} seconds between model calls.")
+        else:
+            print("SloMo disabled.")
+        self._debug_record("slomo", {"seconds": self.slomo_seconds})
+
+    def show_slomo(self) -> None:
+        if self.slomo_seconds:
+            print(f"SloMo delay is {self.slomo_seconds} seconds between model calls.")
+        else:
+            print("SloMo is disabled.")
 
     def dump_context(self, target_path: str | None = None) -> None:
         snapshot = self._conversation_snapshot()
