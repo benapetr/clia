@@ -186,7 +186,7 @@ class AgentCLI:
                     self._debug_record("tool_denied", {"name": tool_name})
                     continue
                 tool_result = self.tools.execute(tool_name, tool_args)
-                print(f"[tool result]\n{tool_result}\n")
+                self._display_tool_result(tool_name, tool_result)
                 self._debug_record("tool_result", {"name": tool_name, "result": tool_result})
                 wrapped_result = self._format_tool_result(tool_name, tool_result)
                 self.conversation.append({"role": "user", "content": wrapped_result})
@@ -315,6 +315,17 @@ class AgentCLI:
         if not text:
             return text
         return f"{self.COLOR_THINK}{text}{self.COLOR_RESET}"
+
+    def _display_tool_result(self, tool_name: str, output: str) -> None:
+        if tool_name == "run_shell" and output:
+            first_line, *rest = output.splitlines()
+            print("[tool result]")
+            print(first_line)
+            if rest:
+                print("(output streamed above; remaining lines delivered to the model)")
+            print()
+            return
+        print(f"[tool result]\n{output}\n")
 
     def _approve_tool_run(self, name: str, args: Dict[str, Any]) -> bool:
         if self.approval_mgr.is_approved(name):
