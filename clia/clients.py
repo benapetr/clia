@@ -9,9 +9,17 @@ import requests
 class ChatClient:
     def __init__(self) -> None:
         self.last_usage: Optional[Dict[str, int]] = None
+        self.last_payload: Optional[Dict[str, Any]] = None
 
     def reset_usage(self) -> None:
         self.last_usage = None
+        self.last_payload = None
+
+    def set_last_payload(self, payload: Dict[str, Any]) -> None:
+        self.last_payload = payload
+
+    def get_last_payload(self) -> Optional[Dict[str, Any]]:
+        return self.last_payload
 
     def chat_stream(
         self,
@@ -57,6 +65,7 @@ class OllamaClient(ChatClient):
             data = json.loads(line)
             if data.get("error"):
                 raise RuntimeError(data["error"])
+            self.set_last_payload(data)
             message = data.get("message") or {}
             content = message.get("content", "")
             if content:
@@ -90,6 +99,7 @@ class OllamaClient(ChatClient):
             data = json.loads(line)
             if data.get("error"):
                 raise RuntimeError(data["error"])
+            self.set_last_payload(data)
             chunk = data.get("response")
             if chunk:
                 yield chunk
@@ -136,7 +146,7 @@ class OpenAIClient(ChatClient):
             timeout=self.timeout,
         )
         response.raise_for_status()
-        yield from _parse_sse_stream(response)
+        yield from _parse_sse_stream(response, self)
 
 
 class MistralClient(ChatClient):
@@ -175,10 +185,10 @@ class MistralClient(ChatClient):
             timeout=self.timeout,
         )
         response.raise_for_status()
-        yield from _parse_sse_stream(response)
+        yield from _parse_sse_stream(response, self)
 
 
-def _parse_sse_stream(response: Any) -> Iterable[str]:
+def _parse_sse_stream(response: Any, client: ChatClient) -> Iterable[str]:
     for raw_line in response.iter_lines(decode_unicode=True):
         if not raw_line:
             continue
@@ -191,6 +201,13 @@ def _parse_sse_stream(response: Any) -> Iterable[str]:
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
+        error_payload = data.get("error")
+        if error_payload:
+            client.set_last_payload({"error": error_payload})
+            if isinstance(error_payload, dict) and "message" in error_payload:
+                raise RuntimeError(error_payload["message"])
+            raise RuntimeError(str(error_payload))
+        client.set_last_payload(data)
         choices = data.get("choices") or []
         for choice in choices:
             delta = choice.get("delta") or {}
@@ -265,3 +282,21 @@ def _parse_ollama_usage(data: Dict[str, Any]) -> Optional[Dict[str, int]]:
         "completion_tokens": completion_tokens,
         "total_tokens": total_tokens,
     }
+
+
+def _extract_completions_usage(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, int]]:
+    if not isinstance(payload, dict):
+        return None
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    result: Dict[str, int] = {}
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = usage.get(key)
+        if value is None:
+            continue
+        try:
+            result[key] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return result or None

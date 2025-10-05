@@ -165,7 +165,16 @@ class AgentCLI:
             result = self._stream_response(self.conversation)
             if result is None:
                 return
-            assistant_reply, usage = result
+            assistant_reply, usage, streamed_tool_calls = result
+            if streamed_tool_calls and not assistant_reply:
+                assistant_reply = "\n".join(
+                    self._format_tool_invocation(name, args)
+                    for name, args in streamed_tool_calls
+                )
+            if not assistant_reply:
+                print("[warning] Model returned an empty response; retry or check logs.")
+                self._debug_record("model_empty", {})
+                assistant_reply = ""
             assistant_message: Dict[str, Any] = {"role": "assistant", "content": assistant_reply}
             if usage:
                 assistant_message["usage"] = usage
@@ -175,6 +184,7 @@ class AgentCLI:
             tool_calls = self._parse_tool_calls(assistant_reply)
             if not tool_calls:
                 break
+            self._debug_record('tool_calls', {'count': len(tool_calls)})
             for tool_name, tool_args in tool_calls:
                 print(f"\n[tool call] {tool_name} {tool_args}")
                 self._debug_record("tool_call", {"name": tool_name, "args": tool_args})
@@ -195,7 +205,7 @@ class AgentCLI:
 
     def _stream_response(
         self, conversation: List[Dict[str, Any]]
-    ) -> Optional[Tuple[str, Optional[Dict[str, int]]]]:
+    ) -> Optional[Tuple[str, Optional[Dict[str, int]], List[Tuple[str, Dict[str, Any]]]]]:
         agent_label = self._label("agent>", self.COLOR_AGENT)
         print(f"{agent_label} ", end="", flush=True)
         chunks: List[str] = []
@@ -237,11 +247,23 @@ class AgentCLI:
             if not usage_info:
                 usage_info = None
         reply = "".join(chunks).strip()
+        payload_getter = getattr(self.client, "get_last_payload", None)
+        raw_payload = payload_getter() if callable(payload_getter) else getattr(self.client, "last_payload", None)
+        streamed_tool_calls = self._extract_stream_tool_calls(raw_payload)
         self._debug_record(
             "model_response",
-            {"reply": reply, "chunks": chunks, "usage": usage_info},
+            {
+                "reply": reply,
+                "chunks": chunks,
+                "usage": usage_info,
+                "raw": raw_payload,
+                "tool_calls": streamed_tool_calls,
+            },
         )
-        return reply, usage_info
+        if not reply and not streamed_tool_calls:
+            print("[error] Model returned empty response; raw payload logged (see debug log).")
+            return None
+        return reply, usage_info, streamed_tool_calls
 
     def _render_think_chunk(
         self,
@@ -303,6 +325,35 @@ class AgentCLI:
                 in_think = False
 
         return "".join(output_parts), buffer, in_think
+
+
+    def _extract_stream_tool_calls(
+        self, payload: Optional[Dict[str, Any]]
+    ) -> List[Tuple[str, Dict[str, Any]]]:
+        calls: List[Tuple[str, Dict[str, Any]]] = []
+        if not isinstance(payload, dict):
+            return calls
+        choices = payload.get("choices") or []
+        for choice in choices:
+            delta = choice.get("delta") or {}
+            tool_section = delta.get("tool_calls") or choice.get("tool_calls") or []
+            for call in tool_section:
+                function = call.get("function") or {}
+                name = function.get("name")
+                arguments = function.get("arguments")
+                if not name or arguments is None:
+                    continue
+                if isinstance(arguments, str):
+                    try:
+                        parsed_args = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        parsed_args = {"raw": arguments}
+                elif isinstance(arguments, dict):
+                    parsed_args = arguments
+                else:
+                    parsed_args = {"value": arguments}
+                calls.append((name, parsed_args))
+        return calls
 
     def _partial_tag_suffix(self, text: str, tag: str) -> int:
         max_check = min(len(text), len(tag) - 1)
@@ -636,3 +687,10 @@ class AgentCLI:
     @staticmethod
     def _format_tool_result(name: str, result: str) -> str:
         return f"<tool_result name=\"{name}\">\n{result}\n</tool_result>"
+
+    def _format_tool_invocation(self, name: str, args: Dict[str, Any]) -> str:
+        try:
+            payload = json.dumps(args, ensure_ascii=False)
+        except TypeError:
+            payload = str(args)
+        return f"<tool name=\"{name}\">\n{payload}\n</tool>"
