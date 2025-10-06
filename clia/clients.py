@@ -70,6 +70,7 @@ class OllamaClient(ChatClient):
             message = data.get("message") or {}
             content = message.get("content", "")
             thinking = message.get("thinking", "")
+            tool_calls = message.get("tool_calls", [])
             
             # Handle thinking tokens
             if thinking:
@@ -81,6 +82,28 @@ class OllamaClient(ChatClient):
                 # We have content but no thinking, close the thinking block
                 yield "</think>\n"
                 in_thinking = False
+            
+            # Handle tool calls - convert to text format so they're visible and stored
+            if tool_calls:
+                for call in tool_calls:
+                    function = call.get("function") or {}
+                    name = function.get("name")
+                    arguments = function.get("arguments")
+                    if name and arguments is not None:
+                        # Format arguments as JSON string if needed
+                        if isinstance(arguments, dict):
+                            args_str = json.dumps(arguments, ensure_ascii=False)
+                        elif isinstance(arguments, str):
+                            # Might already be JSON string, try to parse and reformat
+                            try:
+                                parsed = json.loads(arguments)
+                                args_str = json.dumps(parsed, ensure_ascii=False)
+                            except json.JSONDecodeError:
+                                args_str = arguments
+                        else:
+                            args_str = json.dumps({"value": arguments}, ensure_ascii=False)
+                        
+                        yield f"<tool name=\"{name}\">\n{args_str}\n</tool>\n"
             
             if content:
                 yield content

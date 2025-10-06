@@ -368,6 +368,28 @@ class AgentCLI:
         calls: List[Tuple[str, Dict[str, Any]]] = []
         if not isinstance(payload, dict):
             return calls
+        
+        # Check for Ollama-style tool calls in message.tool_calls
+        message = payload.get("message") or {}
+        ollama_tool_calls = message.get("tool_calls") or []
+        for call in ollama_tool_calls:
+            function = call.get("function") or {}
+            name = function.get("name")
+            arguments = function.get("arguments")
+            if not name or arguments is None:
+                continue
+            if isinstance(arguments, str):
+                try:
+                    parsed_args = json.loads(arguments)
+                except json.JSONDecodeError:
+                    parsed_args = {"raw": arguments}
+            elif isinstance(arguments, dict):
+                parsed_args = arguments
+            else:
+                parsed_args = {"value": arguments}
+            calls.append((name, parsed_args))
+        
+        # Check for OpenAI-style tool calls in choices
         choices = payload.get("choices") or []
         for choice in choices:
             delta = choice.get("delta") or {}
