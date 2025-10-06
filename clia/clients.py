@@ -59,6 +59,7 @@ class OllamaClient(ChatClient):
             yield from self._chat_via_generate(model, messages, options)
             return
         response.raise_for_status()
+        in_thinking = False
         for line in response.iter_lines():
             if not line:
                 continue
@@ -68,9 +69,26 @@ class OllamaClient(ChatClient):
             self.set_last_payload(data)
             message = data.get("message") or {}
             content = message.get("content", "")
+            thinking = message.get("thinking", "")
+            
+            # Handle thinking tokens
+            if thinking:
+                if not in_thinking:
+                    yield "<think>"
+                    in_thinking = True
+                yield thinking
+            elif in_thinking:
+                # We have content but no thinking, close the thinking block
+                yield "</think>\n"
+                in_thinking = False
+            
             if content:
                 yield content
             if data.get("done", False):
+                # Close thinking block if still open
+                if in_thinking:
+                    yield "</think>\n"
+                    in_thinking = False
                 usage = _parse_ollama_usage(data)
                 if usage:
                     self.last_usage = usage
